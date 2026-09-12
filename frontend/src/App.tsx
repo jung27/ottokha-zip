@@ -57,6 +57,16 @@ export default function App() {
     }
   });
   const [recommendation, setRecommendation] = useState("");
+  const [isAiFlow, setIsAiFlow] = useState(false);
+
+  useEffect(() => {
+    if (!recommendation) return;
+    const timer = window.setTimeout(() => {
+      setRecommendation("");
+    }, 3500);
+    return () => window.clearTimeout(timer);
+  }, [recommendation]);
+
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     document
@@ -68,6 +78,7 @@ export default function App() {
       /* 화면 전환은 저장 없이도 동작한다. */
     }
   }, [theme]);
+
   function finishOnboarding() {
     try {
       localStorage.setItem(INTRO_KEY, "true");
@@ -76,6 +87,7 @@ export default function App() {
     }
     setShowOnboarding(false);
   }
+
   async function handleStartWithAI(input: string, signal: AbortSignal) {
     const timeout = new AbortController();
     const timer = window.setTimeout(() => timeout.abort(), 15000);
@@ -90,12 +102,16 @@ export default function App() {
         );
       const result = parseRecommendation(await response.json());
       if (signal.aborted) return;
-      setGame({ ...makeNewGame(), ...result, page: "contract" });
+
+      const newGame = { ...makeNewGame(), ...result, page: "house" as const };
+      const contractLabelText =
+        result.contract === "monthly" ? "월세" : "전세 + 대출";
+      const homeName = selectedHome(newGame).name;
+
+      setGame(newGame);
+      setIsAiFlow(true);
       setRecommendation(
-        "AI가 고른 조건: " +
-          (result.contract === "monthly" ? "월세" : "전세 + 대출") +
-          " · " +
-          selectedHome({ ...makeNewGame(), ...result }).name,
+        `AI가 '${contractLabelText} · ${homeName}' 조건을 추천했습니다.`,
       );
       setShowHome(false);
     } catch (error) {
@@ -115,6 +131,7 @@ export default function App() {
       window.clearTimeout(timer);
     }
   }
+
   const [modal, setModal] = useState<ModalKind>(null);
   const [storageFailed, setStorageFailed] = useState(false);
   const appRef = useRef<HTMLElement>(null);
@@ -198,6 +215,7 @@ export default function App() {
     setModal(null);
     setShowHome(false);
     setRecommendation("");
+    setIsAiFlow(false);
     setGame((previous) => ({
       ...makeNewGame(),
       page:
@@ -206,12 +224,14 @@ export default function App() {
       house: mode === "start" ? "oneroom" : previous.house,
     }));
   }
+
   function replay(stepId: string) {
     setGame((previous) => rewindGame(previous, stepId));
     setReplayVersion((version) => version + 1);
     setShowHome(false);
     setModal(null);
   }
+
   function choose(id: string) {
     if (
       answered ||
@@ -225,6 +245,7 @@ export default function App() {
       answers: { ...previous.answers, [step.id]: [id] },
     }));
   }
+
   function toggle(id: string) {
     if (answered || !step.items?.some((item) => item.id === id)) return;
     setGame((previous) => {
@@ -240,6 +261,7 @@ export default function App() {
       };
     });
   }
+
   function submit() {
     if (!hasRequiredItems(step, selected)) return;
     if (!answered)
@@ -251,6 +273,7 @@ export default function App() {
         },
       }));
   }
+
   function next() {
     if (!hasRequiredItems(step, selected)) return;
     if (step.kind !== "info" && step.kind !== "recap" && !answered) return;
@@ -272,6 +295,7 @@ export default function App() {
       };
     });
   }
+
   function setupNext() {
     setGame((previous) => {
       if (previous.page === "prologue")
@@ -286,6 +310,7 @@ export default function App() {
       return { ...previous, page: "play", cursor: "listing" };
     });
   }
+
   const playProps: PlayViewProps = {
     step,
     selected,
@@ -298,6 +323,7 @@ export default function App() {
     onNext: next,
     onRetry: () => replay(step.id),
   };
+
   const homeProps = {
     started: game.page !== "home",
     onStartNew: () => (game.page !== "home" ? setModal("new") : restart()),
@@ -374,7 +400,9 @@ export default function App() {
                 ...previous,
                 page:
                   previous.page === "house"
-                    ? "tutorial"
+                    ? isAiFlow
+                      ? "home"
+                      : "tutorial"
                     : previous.page === "tutorial"
                       ? "contract"
                       : "prologue",
