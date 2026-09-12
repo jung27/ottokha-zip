@@ -216,8 +216,6 @@ export function TalkView({
       >
         {correct && !transitioning && (
           <p className="animate-reveal text-[0.97rem] leading-[1.95] whitespace-pre-line max-[600px]:text-[0.88rem]" aria-live="polite" data-success-feedback>
-            <strong className="font-bold text-accent">잘 하셨습니다</strong>
-            <br /><br />
             {successText}
           </p>
         )}

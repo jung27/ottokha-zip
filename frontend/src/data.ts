@@ -1866,8 +1866,54 @@ export function getCheckpoints(g: GameState): Checkpoint[] {
   });
 }
 
+// 진행 중 경고와 재시도 기록은 유지하되, 엔딩에는 장면마다 피드백을 하나만 전달한다.
+export function getReviewCheckpoints(g: GameState): Checkpoint[] {
+  const checkpoints = getCheckpoints(g);
+  const uniqueText = (texts: string[]) => [...new Set(texts.filter(Boolean))].join("\n\n");
+  return getSteps(g).flatMap<Checkpoint>((step) => {
+    const notes = checkpoints.filter((note) => note.stepId === step.id);
+    if (!notes.length) return [];
+    const risk = notes.find(isRiskCheckpoint);
+    const primary = risk ?? notes[notes.length - 1];
+    const review: Checkpoint = {
+      ...primary,
+      id: step.id,
+      title: step.title,
+      choice: risk ? "다시 확인할 사항" : "확인할 사항",
+      status: risk ? "risk" : "checked",
+      countRisk: !!risk,
+      showFeedback: false,
+      explanation: undefined,
+    };
+    if (step.choices) {
+      // 서로 다른 오답과 이후의 정답도 동일한 장면의 설명으로 합친다.
+      const explanation = risk ? step.explanation : undefined;
+      return [{
+        ...review,
+        title: explanation?.title ?? review.title,
+        consequence: explanation?.text ?? primary.consequence,
+        advice: explanation?.advice ?? primary.advice,
+      }];
+    }
+    // 체크 항목은 과거 누락과 이후 확인을 같은 항목으로 묶어 설명을 중복하지 않는다.
+    const topics = new Map<string, Checkpoint>();
+    for (const note of notes) {
+      const id = note.id.replace(":attempt:", ":");
+      const previous = topics.get(id);
+      if (!previous || !isRiskCheckpoint(previous)) topics.set(id, note);
+    }
+    const summaries = [...topics.values()];
+    return [{
+      ...review,
+      category: step.id === "inspection" ? "inspection" : step.id === "clauses" ? "clause" : "check",
+      consequence: uniqueText(summaries.map((note) => `${note.title}\n${note.consequence}`)),
+      advice: uniqueText(summaries.map((note) => note.advice)),
+    }];
+  });
+}
+
 export function getEnding(g: GameState): Ending {
-  const risks = getCheckpoints(g).filter(isRiskCheckpoint);
+  const risks = getReviewCheckpoints(g).filter(isRiskCheckpoint);
   return {
     id: "complete",
     symbol: "key",

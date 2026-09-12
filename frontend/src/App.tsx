@@ -7,6 +7,7 @@ import { AppModals } from "./components/modals/AppModals";
 import {
   parseRecommendation,
   getCheckpoints,
+  getReviewCheckpoints,
   getEnding,
   getSteps,
   makeNewGame,
@@ -108,10 +109,10 @@ export default function App() {
     steps.findIndex((step) => step.id === game.cursor),
   );
   const step = steps[index];
-  const notes = getCheckpoints(game);
+  const notes = getReviewCheckpoints(game);
   const answered = Object.hasOwn(game.answers, step.id);
   const selected = game.answers[step.id] ?? game.drafts[step.id] ?? [];
-  const feedback = notes.filter((n) => n.stepId === step.id);
+  const feedback = getCheckpoints(game).filter((n) => n.stepId === step.id);
   const isHome = showHome || game.page === "home";
   const ending = game.page === "ending" && !showHome;
 

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   getCheckpoints,
+  getReviewCheckpoints,
   getEnding,
   getSteps,
   hasRequiredItems,
@@ -96,6 +97,12 @@ function finish(contract, house, mode) {
       );
       assert.equal(getEnding(game).id, "complete");
       assert.equal(visited.at(-1).id, "moving");
+      const review = getReviewCheckpoints(game);
+      assert.equal(review.length, visited.length);
+      assert.equal(new Set(review.map((note) => note.stepId)).size, review.length);
+      const riskyScenes = new Set(getCheckpoints(game).filter(isRiskCheckpoint).map((note) => note.stepId));
+      assert.equal(review.filter(isRiskCheckpoint).length, riskyScenes.size);
+      assert.deepEqual(getEnding(game).reasons, [String(riskyScenes.size)]);
       return game;
     }
   }
@@ -187,7 +194,7 @@ test("all inspected and skipped items, including house-specific extras, remain i
       .find((item) => item.stepId === "listing")
       .consequence.includes("좋은 조건의 매물로 방문을 유도"),
   );
-  const risks = notes.filter(isRiskCheckpoint).length;
+  const risks = getReviewCheckpoints(game).filter(isRiskCheckpoint).length;
   assert.equal(
     getEnding(game).text,
     "당신은 이번 계약에서 위험한 선택 " + risks + "번을 했습니다.",
@@ -379,8 +386,11 @@ test("each wrong choice stays disabled after retry and all attempts survive the 
     const notes = getCheckpoints(game).filter((note) => note.stepId === step.id);
     assert.equal(notes.filter(isRiskCheckpoint).length, 3);
     assert.equal(notes.filter((note) => note.showFeedback).length, 0);
-    assert.match(getSuccessExplanation(game, step), /선택이 좋습니다/);
-    assert.ok(getSuccessExplanation(game, step).includes(correct.feedback.text));
+    const review = getReviewCheckpoints(game).filter((note) => note.stepId === step.id);
+    assert.equal(review.length, 1);
+    assert.equal(review.filter(isRiskCheckpoint).length, 1);
+    assert.equal(review[0].consequence, step.explanation.text);
+    assert.equal(getSuccessExplanation(game, step), step.explanation.text);
     assert.equal(advanceGame(game, step.id).cursor, "inspection");
     assert.equal(advanceGame(advanceGame(game, step.id), step.id).cursor, "inspection");
   }
@@ -401,16 +411,18 @@ test("retrying does not rewind earlier progress, while an explicit stage replay 
   assert.equal(canAdvanceStep(game, getSteps(game).find((step) => step.id === "deposit")), false);
 });
 
-test("every correct choice has positive, scenario-specific feedback", () => {
+test("every correct choice explains precautions without praise or repeating the chosen action", () => {
   for (const contract of ["monthly", "jeonse"]) {
     for (const home of homes.filter((item) => contract === "monthly" || item.jeonse !== null)) {
       const game = finish(contract, home.id, "checked");
       for (const step of getSteps(game).filter((item) => item.choices)) {
         const text = getSuccessExplanation(game, step);
-        assert.match(text, /점이 좋습니다|선택이 좋습니다/, `${contract}/${home.id}/${step.id}`);
+        assert.doesNotMatch(text, /잘 하셨습니다|점이 좋습니다|선택이 좋습니다/, `${contract}/${home.id}/${step.id}`);
         assert.ok(text.length > 30);
+        assert.ok(text.includes(step.explanation.text));
         const choice = step.choices.find((item) => item.status === "checked");
-        assert.ok(text.includes(choice.feedback.text));
+        const normalize = (value) => value.replace(/[\p{P}\p{S}\s]/gu, "");
+        assert.ok(!text.split("\n\n").some((paragraph) => normalize(paragraph) === normalize(choice.label)));
       }
     }
   }
@@ -430,5 +442,43 @@ test("warning checklists require correction without resetting selections or losi
   assert.equal(canAdvanceStep(game, step), true);
   assert.equal(getCheckpoints(game).filter(isRiskCheckpoint).length, 1);
   assert.equal(getCheckpoints(game).filter((note) => note.showFeedback).length, 0);
+  const review = getReviewCheckpoints(game);
+  assert.equal(review.length, 1);
+  assert.equal(review.filter(isRiskCheckpoint).length, 1);
+  assert.ok(!review[0].consequence.includes(step.items.find((item) => item.id === "tax").signal));
   assert.equal(advanceGame(game, step.id).cursor, "account");
+});
+
+test("repeated attempts and a later correct answer produce only one review and risk per scene", () => {
+  let game = { ...makeNewGame(), page: "play", cursor: "listing" };
+  const step = getSteps(game).find((item) => item.id === "listing");
+  const wrong = step.choices.find((choice) => choice.status === "risk");
+  const correct = step.choices.find((choice) => choice.status === "checked");
+  game = chooseAnswer(game, step.id, wrong.id);
+  const before = getReviewCheckpoints(game);
+  game = retryChoice(game, step.id);
+  assert.deepEqual(getReviewCheckpoints(game), before);
+  game = chooseAnswer(game, step.id, correct.id);
+  assert.deepEqual(getReviewCheckpoints(game), before);
+  const repeated = { ...game, attempts: { listing: [wrong.id, wrong.id, correct.id, wrong.id, correct.id] } };
+  assert.deepEqual(getReviewCheckpoints(repeated), before);
+  assert.deepEqual(getEnding(repeated).reasons, ["1"]);
+  assert.deepEqual(game.attempts.listing, [wrong.id, correct.id]);
+});
+
+test("correct-only scenes have one safe review and separate scenes retain separate risks", () => {
+  let game = { ...makeNewGame(), page: "play", cursor: "listing" };
+  const listing = getSteps(game).find((step) => step.id === "listing");
+  const correct = listing.choices.find((choice) => choice.status === "checked");
+  game = chooseAnswer(game, listing.id, correct.id);
+  assert.equal(getReviewCheckpoints(game).length, 1);
+  assert.equal(getReviewCheckpoints(game).filter(isRiskCheckpoint).length, 0);
+  assert.deepEqual(getEnding(game).reasons, ["0"]);
+  game = finish("jeonse", "officetel", "risk");
+  const review = getReviewCheckpoints(game);
+  const riskyScenes = new Set(getCheckpoints(game).filter(isRiskCheckpoint).map((note) => note.stepId));
+  assert.ok(riskyScenes.size > 1);
+  assert.equal(review.filter(isRiskCheckpoint).length, riskyScenes.size);
+  assert.ok(review.find((note) => note.stepId === "clauses").consequence);
+  assert.ok(review.find((note) => note.stepId === "inspection").consequence.includes("곰팡이"));
 });
