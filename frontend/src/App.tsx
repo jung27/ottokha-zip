@@ -246,6 +246,7 @@ export default function App() {
   };
 
   const homeProps = {
+    game,
     started: game.page !== "home",
     onStartNew: () => (game.page !== "home" ? setModal("new") : restart()),
     onChooseConditions: () =>
