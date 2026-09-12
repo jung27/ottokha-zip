@@ -5,7 +5,7 @@ import {
   type ReactNode,
 } from "react";
 import { dictionary } from "../data";
-import { scenePhotos as backgrounds, type ScenePhoto } from "../scenePhotos";
+import { scenePhotos as backgrounds, sceneImageSizes, type ScenePhoto } from "../scenePhotos";
 import type { Background } from "../types";
 import { Icon } from "./Icon";
 import { ScenePopup } from "./StoryModal";
@@ -19,14 +19,20 @@ const sceneImages = new Map<
     decoded: boolean;
   }
 >();
-function prepareSceneImage(src: string) {
+function prepareSceneImage(photo: ScenePhoto, priority: "high" | "low" = "low") {
+  const src = photo.src!;
   const cached = sceneImages.get(src);
   if (cached) {
+    if (priority === "high") cached.image.fetchPriority = "high";
     sceneImages.delete(src);
     sceneImages.set(src, cached);
     return cached.ready;
   }
   const image = new Image();
+  image.fetchPriority = priority;
+  image.decoding = "async";
+  image.sizes = sceneImageSizes;
+  image.srcset = photo.srcSet ?? "";
   image.src = src;
   const entry = {
     image,
@@ -50,16 +56,20 @@ function prepareSceneImage(src: string) {
   return entry.ready;
 }
 
-export function SceneImagePreloader() {
+export function SceneImagePreloader({ backgrounds: upcoming }: { backgrounds: Background[] }) {
+  const key = [...new Set(upcoming)].join(",");
   useEffect(() => {
-    // 첫 장면과 위치를 눌러야 하는 방 사진을 미리 준비한다.
-    for (const photo of [backgrounds.app, backgrounds.message, backgrounds.room]) {
-      if (photo.src)
-        void prepareSceneImage(photo.src).catch(() => {
-          // 해당 장면에서 다시 시도하고, 실패하면 기존 사진 안내를 표시한다.
-        });
-    }
-  }, []);
+    let cancelled = false;
+    // 다음 장면을 순서대로 준비해 현재 사진의 다운로드와 과도하게 경쟁하지 않는다.
+    void (async () => {
+      for (const name of key.split(",") as Background[]) {
+        if (cancelled) break;
+        const photo = backgrounds[name];
+        if (photo?.src) await prepareSceneImage(photo).catch(() => {});
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [key]);
   return null;
 }
 
@@ -72,7 +82,7 @@ function SceneBackground({ photo }: { photo: ScenePhoto }) {
   useEffect(() => {
     if (!photo.src) return;
     let cancelled = false;
-    void prepareSceneImage(photo.src)
+    void prepareSceneImage(photo, "high")
       .then(() => {
         if (!cancelled) setReadyPhoto(photo);
       })
@@ -90,8 +100,11 @@ function SceneBackground({ photo }: { photo: ScenePhoto }) {
     <img
       className="absolute inset-0 block size-full object-contain object-center"
       src={visiblePhoto.src}
+      srcSet={visiblePhoto.srcSet}
+      sizes={sceneImageSizes}
       alt={visiblePhoto.description}
-      decoding="sync"
+      decoding="async"
+      fetchPriority="high"
       draggable={false}
     />
   ) : (
@@ -129,21 +142,10 @@ function isCompactScene() {
   return window.matchMedia(compactSceneQuery).matches;
 }
 
-function Dictionary({
-  context,
-  autoFocus = false,
-}: {
-  context: string;
-  autoFocus?: boolean;
-}) {
+function Dictionary({ autoFocus = false }: { autoFocus?: boolean }) {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState<string | null>(null);
   const search = query.trim();
-  const relevant = dictionary.filter((entry) =>
-    [entry.term, ...(entry.aliases ?? [])].some((term) =>
-      context.includes(term),
-    ),
-  );
   const entries = search
     ? dictionary
         .filter((entry) =>
@@ -156,9 +158,7 @@ function Dictionary({
             Number(b.term === search) - Number(a.term === search) ||
             Number(b.term.includes(search)) - Number(a.term.includes(search)),
         )
-    : relevant.length
-      ? relevant
-      : dictionary;
+    : dictionary;
   const selected = entries.find((entry) => entry.term === active) ?? entries[0];
   return (
     <>
@@ -179,13 +179,10 @@ function Dictionary({
         />
       </label>
       <p className="mt-[17px] text-[0.65rem] text-muted max-[600px]:mt-3">
-        {search
-          ? "검색 결과"
-          : relevant.length
-            ? "이 장면의 단어"
-            : "계약 용어"}
+        {search ? "검색 결과" : "전체 계약 용어"}
       </p>
       <div
+        data-dictionary-list
         className={`mt-[9px] mb-[17px] flex max-h-[100px] flex-wrap gap-1.5 overflow-y-auto p-0.5 [&_button]:rounded-[7px]
         [&_button]:border [&_button]:border-line [&_button]:px-2 [&_button]:py-[5px] [&_button]:text-[0.68rem]
         [&_button]:text-muted [&_button[aria-pressed=true]]:border-accent
@@ -229,7 +226,6 @@ function Dictionary({
 
 export function SceneFrame({
   background,
-  context = "",
   scene,
   overlay,
   children,
@@ -250,7 +246,7 @@ export function SceneFrame({
     <section
       className={
         `mx-auto grid w-[min(100%,calc(var(--scene-width)+264px))] grid-cols-[minmax(0,1fr)_248px]
-        grid-rows-[auto_176px] gap-x-4 gap-y-3.5 [--scene-width:clamp(720px,calc((100svh-306px)*16/9),1024px)]
+        grid-rows-[auto_176px] gap-x-4 gap-y-3.5 [--scene-width:clamp(640px,calc((100svh-384px)*16/9),1024px)]
         max-[1100px]:w-[min(100%,var(--scene-width))] max-[1100px]:grid-cols-[minmax(0,1fr)] max-[600px]:w-full
         max-[600px]:gap-2.5 ` + className
       }
@@ -298,7 +294,7 @@ export function SceneFrame({
             onClose={() => setDictionaryOpen(false)}
             dictionary
           >
-            <Dictionary context={context} autoFocus />
+            <Dictionary autoFocus />
           </ScenePopup>
         )}
       </div>
@@ -317,7 +313,7 @@ export function SceneFrame({
             <h2>용어 사전</h2>
           </div>
           <div className="min-h-0 overflow-y-auto px-[18px] pb-5 [scrollbar-width:thin]">
-            <Dictionary context={context} />
+            <Dictionary />
           </div>
         </aside>
       )}

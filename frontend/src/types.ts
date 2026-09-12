@@ -12,7 +12,6 @@ export type Page =
   | "home"
   | "prologue"
   | "contract"
-  | "tutorial"
   | "house"
   | "play"
   | "ending";
@@ -85,7 +84,7 @@ export type CheckItem = {
 export type Step = {
   id: string;
   stage: Stage;
-  kind: "choice" | "inspection" | "checklist" | "registry" | "info" | "recap";
+  kind: "choice" | "inspection" | "checklist" | "info" | "recap";
   eyebrow: string;
   title: string;
   beats: StoryBeat[];

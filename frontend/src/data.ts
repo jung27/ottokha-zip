@@ -14,7 +14,6 @@ import type {
   Stage,
   Step,
 } from "./types.ts";
-import { registryPoints, registryFinding } from "./registry.ts";
 
 // 기존 Home 구조를 유지하면서 추가 설명을 보관한다.
 type HomeWithDetails = Home & {
@@ -1679,20 +1678,6 @@ export function getSteps(g: GameState): Step[] {
       explanation: warnings.timing,
     },
     {
-      id: "registry-game",
-      stage: 5,
-      kind: "registry",
-      eyebrow: "등기부 읽기",
-      title: "등기부에서 달라진 곳 찾기",
-      beats: [
-        beat("잔금일에 다시 발급한 등기부다. 갑구와 을구에서 이상한 곳을 찾아 눌러보자."),
-      ],
-      background: "lease",
-      items: registryPoints,
-      requiredItems: ["mortgage-date"],
-      explanation: registryFinding,
-    },
-    {
       ...choiceStep(
         "settlement",
         5,
@@ -1842,7 +1827,7 @@ export function getCheckpoints(g: GameState): Checkpoint[] {
         : step.id === "clauses" && item.id === "registration" && g.house === "officetel"
           ? warnings.registration
           : step.id === "clauses" && item.id === "insurance" ? warnings.insurance : undefined;
-      const warning = !checked && step.kind !== "registry" && (step.id !== "signing" || !!special);
+      const warning = !checked && (step.id !== "signing" || !!special);
       return {
         id: step.id + ":" + item.id, stepId: step.id, stage: step.stage,
         status: checked ? "checked" : "risk",
@@ -1877,7 +1862,6 @@ export function getCheckpoints(g: GameState): Checkpoint[] {
     };
     if (step.id === "clauses" && selected.length === 0) addNotice("oral", warnings.oral, true);
     if (step.notice) addNotice("notice", step.notice);
-    if (step.kind === "registry") addNotice("finding", registryFinding, false, false);
     return notes;
   });
 }

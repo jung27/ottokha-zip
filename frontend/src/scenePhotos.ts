@@ -1,33 +1,38 @@
-import housingApp from "./assets/housing-app.png";
-import brokerMessage from "./assets/broker-message.png";
-import office from "./assets/scenes/real-estate-office.jpg";
-import agent from "./assets/scenes/broker.jpg";
-import oneroom from "./assets/scenes/oneroom-exterior.jpg";
-import officetel from "./assets/scenes/officetel-exterior.jpg";
-import villa from "./assets/scenes/villa-exterior.jpg";
-import rooftop from "./assets/scenes/rooftop-exterior.jpg";
-import basement from "./assets/scenes/basement-exterior.jpg";
-import goshiwon from "./assets/scenes/goshiwon-exterior.jpg";
-import roomEntry from "./assets/scenes/room-entry.jpg";
-import room from "./assets/scenes/room-interior.jpg";
-import depositMessage from "./assets/scenes/deposit-message.jpg";
-import ownerAccount from "./assets/scenes/owner-account-mismatch.jpg";
-import lease from "./assets/scenes/contract-desk.jpg";
-import signing from "./assets/scenes/contract-signing.jpg";
-import moving from "./assets/scenes/moving-day.jpg";
-import accountChange from "./assets/scenes/account-change.jpg";
-import balanceDay from "./assets/scenes/balance-day.jpg";
-import settlement from "./assets/scenes/move-in-settlement.jpg";
-import insurance from "./assets/scenes/deposit-insurance.jpg";
-import defect from "./assets/scenes/move-in-defect.jpg";
+const housingApp = "housing-app";
+const brokerMessage = "broker-message";
+const office = "real-estate-office";
+const agent = "broker";
+const oneroom = "oneroom-exterior";
+const officetel = "officetel-exterior";
+const villa = "villa-exterior";
+const rooftop = "rooftop-exterior";
+const basement = "basement-exterior";
+const goshiwon = "goshiwon-exterior";
+const roomEntry = "room-entry";
+const room = "room-interior";
+const depositMessage = "deposit-message";
+const ownerAccount = "owner-account-mismatch";
+const lease = "contract-desk";
+const signing = "contract-signing";
+const moving = "moving-day";
+const accountChange = "account-change";
+const balanceDay = "balance-day";
+const settlement = "move-in-settlement";
+const insurance = "deposit-insurance";
+const defect = "move-in-defect";
 import type { Background } from "./types";
 
-export type ScenePhoto = { description: string; specified: boolean; src?: string };
-const photo = (src: string, description: string): ScenePhoto => ({
-  src,
-  description,
-  specified: true,
-});
+import imageReport from "../image-optimization.json";
+
+export const sceneImageSizes = "(max-width: 600px) calc(100vw - 24px), (max-width: 1100px) calc(100vw - 56px), 1024px";
+const imageFiles = import.meta.glob<string>("./assets/optimized/*.webp", { eager: true, import: "default", query: "?url" });
+export type ScenePhoto = { description: string; specified: boolean; src?: string; srcSet?: string };
+const photo = (name: string, description: string): ScenePhoto => {
+  const src = imageFiles[`./assets/optimized/${name}.webp`];
+  const small = imageFiles[`./assets/optimized/${name}-small.webp`];
+  const dimensions = imageReport.find((entry) => entry.file.replace(/\.[^.]+$/, "") === name)!;
+  return { src, srcSet: `${small} ${dimensions["800"].width}w, ${src} ${dimensions["1600"].width}w`, description, specified: true };
+};
 
 export const scenePhotos: Record<Background, ScenePhoto> = {
   home: photo(housingApp, "부동산 앱에서 집을 찾아보는 화면"),

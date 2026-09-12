@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { DialogueBox, NextButton, SceneFrame } from "../components/Journal";
-import { ScenePopup } from "../components/StoryModal";
-import { FeedbackPanel } from "./TalkView";
+import { ScenePopup, StoryModal } from "../components/StoryModal";
+import { inspectionGuide } from "../inspectionGuide";
 import { hasRequiredItems } from "../data";
 import type { PlayViewProps } from "../types";
 
@@ -24,15 +24,16 @@ export function ExploreView({
   step,
   selected,
   answered,
-  feedback,
   onToggle,
   onSubmit,
   onNext,
-  onRetry,
 }: PlayViewProps) {
   const [line, setLine] = useState(0);
   const [detail, setDetail] = useState<string | null>(null);
   const [extrasOpen, setExtrasOpen] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [lastChecked, setLastChecked] = useState<string | null>(null);
+  const extraButton = useRef<HTMLButtonElement>(null);
   const interactive = line >= step.beats.length;
   const current = step.beats[Math.min(line, step.beats.length - 1)];
   const items = step.items ?? [];
@@ -49,11 +50,30 @@ export function ExploreView({
   ).length;
   function inspect(id: string) {
     setDetail(id);
-    if (!selected.includes(id)) onToggle(id);
+    setDetailOpen(true);
   }
+  function confirmInspection() {
+    if (!item) return;
+    if (!selected.includes(item.id)) onToggle(item.id);
+    setLastChecked(item.title);
+    setDetailOpen(false);
+    if (extrasOpen) extraButton.current?.focus();
+  }
+  const guide = item ? inspectionGuide(item) : undefined;
+  const detailContent = guide && (
+    <div className="mt-4 space-y-4 text-sm leading-relaxed" data-inspection-guide>
+      <section><h3 className="mb-1 font-bold text-accent">왜 중요한가요?</h3><p>{guide.reason}</p></section>
+      <section><h3 className="mb-1 font-bold">이렇게 확인하세요</h3><p>{guide.method}</p></section>
+      <section className="rounded-xl bg-accent-soft p-3"><h3 className="mb-1 font-bold text-accent">양호한 상태</h3><p>{guide.good}</p></section>
+      <section className="rounded-xl bg-risk-bg p-3"><h3 className="mb-1 font-bold text-risk">주의할 신호</h3><p>{guide.warning}</p></section>
+      {guide.advice !== guide.method && <p>{guide.advice}</p>}
+      <div className="flex justify-end"><NextButton onClick={confirmInspection}>확인</NextButton></div>
+    </div>
+  );
   const extraPoints = extraItems.map((point) => (
     <button
       key={point.id}
+      ref={point.id === detail ? extraButton : undefined}
       className={`flex min-h-10 items-center gap-2 rounded-[9px] border border-line bg-surface px-3 py-[9px] text-left
             text-[0.73rem] leading-[1.7] [&_span]:text-accent aria-pressed:border-accent aria-pressed:bg-selected
             aria-pressed:text-accent enabled:hover:border-accent max-[600px]:min-h-9 max-[600px]:gap-[5px]
@@ -62,7 +82,6 @@ export function ExploreView({
       disabled={answered}
       onClick={() => {
         inspect(point.id);
-        setExtrasOpen(false);
       }}
     >
       <span>{selected.includes(point.id) ? "✓" : "+"}</span>
@@ -81,18 +100,20 @@ export function ExploreView({
       }
       overlay={
         answered ? (
-          <FeedbackPanel
-            feedback={feedback}
-            onNext={onNext}
-            onRetry={onRetry}
-          />
+          <ScenePopup title={step.notice?.title ?? "임장 팁"} onClose={onNext} hideClose actions={<NextButton onClick={onNext} />}>
+            <p className="text-sm leading-relaxed">{step.notice?.text}</p>
+          </ScenePopup>
         ) : extrasOpen ? (
-          <ScenePopup
+          <StoryModal
             title="추가로 살펴볼 곳"
-            onClose={() => setExtrasOpen(false)}
+            onClose={() => { setExtrasOpen(false); setDetailOpen(false); }}
           >
             <div className="grid gap-2">{extraPoints}</div>
-          </ScenePopup>
+            {detailOpen && item?.extra ? <><h2 className="mt-5 font-bold">{item.title}</h2>{detailContent}</> : <p className="mt-4 text-sm text-muted">{lastChecked ? `${lastChecked} 확인했습니다. ` : ""}다른 항목도 계속 선택할 수 있어요. 추가 확인 {extraCount} / {extraItems.length}</p>}
+            <div className="mt-4 flex justify-end"><button className="rounded-lg border border-line px-4 py-2 text-sm" onClick={() => { setExtrasOpen(false); setDetailOpen(false); }}>방으로 돌아가기</button></div>
+          </StoryModal>
+        ) : detailOpen && item ? (
+          <StoryModal title={item.title} onClose={() => setDetailOpen(false)}>{detailContent}</StoryModal>
         ) : undefined
       }
       scene={
@@ -177,17 +198,17 @@ export function ExploreView({
     >
       {
         <DialogueBox
-          speaker={interactive ? item?.title : current.speaker}
+          speaker={interactive || answered ? undefined : current.speaker}
           text={
-            interactive
-              ? (item?.description ??
+            answered ? "완료됐습니다." : interactive
+              ? (lastChecked ? `${lastChecked} 확인했습니다.` :
                 `사진 속 ${commonItems.length}곳과 추가 확인 ${extraItems.length}곳을 모두 살펴보자.`)
               : current.text
           }
           actions={
-            interactive ? (
+            answered ? null : interactive ? (
               <>
-                {item && !answered && (
+                {item && selected.includes(item.id) && (
                   <button
                     className={`inline-flex min-h-[42px] items-center justify-center gap-[9px] rounded-[10px] px-1.5 py-[11px]
                       text-[0.79rem] font-[650] leading-[1.45] whitespace-normal transition-[background,border-color]
@@ -195,6 +216,7 @@ export function ExploreView({
                       max-[600px]:py-2.5 max-[600px]:text-[0.74rem] text-muted hover:text-accent`}
                     onClick={() => {
                       onToggle(item.id);
+                      setLastChecked(null);
                       setDetail(null);
                     }}
                   >
@@ -216,15 +238,6 @@ export function ExploreView({
                 ? `총 ${items.length}곳을 모두 확인했습니다. 임장을 마칠 수 있어요.`
                 : `공통 ${commonItems.length}곳과 추가 ${extraItems.length}곳을 모두 확인해야 합니다. ${remainingCount}곳 남았어요.`}
             </p>
-          )}
-          {interactive && item && (
-            <div
-              className="mt-2.5 text-[0.8rem] [&_p+p]:mt-[5px] [&_p+p]:text-[0.73rem] [&_p+p]:text-muted max-[600px]:text-[0.75rem]"
-              aria-live="polite"
-            >
-              <p>{item.signal}</p>
-              {item.advice !== item.description && <p>{item.advice}</p>}
-            </div>
           )}
         </DialogueBox>
       }

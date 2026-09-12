@@ -1,0 +1,310 @@
+[
+  {
+    "file": "housing-app.png",
+    "originalBytes": 1742489,
+    "1600": {
+      "bytes": 90338,
+      "width": 1600,
+      "height": 900
+    },
+    "800": {
+      "bytes": 35622,
+      "width": 800,
+      "height": 450
+    }
+  },
+  {
+    "file": "broker-message.png",
+    "originalBytes": 1551219,
+    "1600": {
+      "bytes": 75140,
+      "width": 1600,
+      "height": 900
+    },
+    "800": {
+      "bytes": 30168,
+      "width": 800,
+      "height": 450
+    }
+  },
+  {
+    "file": "real-estate-office.jpg",
+    "originalBytes": 2915074,
+    "1600": {
+      "bytes": 247540,
+      "width": 1600,
+      "height": 900
+    },
+    "800": {
+      "bytes": 80276,
+      "width": 800,
+      "height": 450
+    }
+  },
+  {
+    "file": "broker.jpg",
+    "originalBytes": 2272863,
+    "1600": {
+      "bytes": 140436,
+      "width": 1600,
+      "height": 900
+    },
+    "800": {
+      "bytes": 52786,
+      "width": 800,
+      "height": 450
+    }
+  },
+  {
+    "file": "oneroom-exterior.jpg",
+    "originalBytes": 3458954,
+    "1600": {
+      "bytes": 362086,
+      "width": 1600,
+      "height": 900
+    },
+    "800": {
+      "bytes": 99130,
+      "width": 800,
+      "height": 450
+    }
+  },
+  {
+    "file": "officetel-exterior.jpg",
+    "originalBytes": 2960682,
+    "1600": {
+      "bytes": 295994,
+      "width": 1600,
+      "height": 900
+    },
+    "800": {
+      "bytes": 97920,
+      "width": 800,
+      "height": 450
+    }
+  },
+  {
+    "file": "villa-exterior.jpg",
+    "originalBytes": 3001997,
+    "1600": {
+      "bytes": 233266,
+      "width": 1600,
+      "height": 900
+    },
+    "800": {
+      "bytes": 75108,
+      "width": 800,
+      "height": 450
+    }
+  },
+  {
+    "file": "rooftop-exterior.jpg",
+    "originalBytes": 2728174,
+    "1600": {
+      "bytes": 179088,
+      "width": 1600,
+      "height": 900
+    },
+    "800": {
+      "bytes": 62010,
+      "width": 800,
+      "height": 450
+    }
+  },
+  {
+    "file": "basement-exterior.jpg",
+    "originalBytes": 3287967,
+    "1600": {
+      "bytes": 310126,
+      "width": 1600,
+      "height": 900
+    },
+    "800": {
+      "bytes": 88588,
+      "width": 800,
+      "height": 450
+    }
+  },
+  {
+    "file": "goshiwon-exterior.jpg",
+    "originalBytes": 3276013,
+    "1600": {
+      "bytes": 312118,
+      "width": 1600,
+      "height": 900
+    },
+    "800": {
+      "bytes": 94254,
+      "width": 800,
+      "height": 450
+    }
+  },
+  {
+    "file": "room-entry.jpg",
+    "originalBytes": 2113339,
+    "1600": {
+      "bytes": 80700,
+      "width": 1600,
+      "height": 900
+    },
+    "800": {
+      "bytes": 28380,
+      "width": 800,
+      "height": 450
+    }
+  },
+  {
+    "file": "room-interior.jpg",
+    "originalBytes": 2297427,
+    "1600": {
+      "bytes": 106044,
+      "width": 1600,
+      "height": 900
+    },
+    "800": {
+      "bytes": 33850,
+      "width": 800,
+      "height": 450
+    }
+  },
+  {
+    "file": "deposit-message.jpg",
+    "originalBytes": 1857886,
+    "1600": {
+      "bytes": 78062,
+      "width": 1600,
+      "height": 900
+    },
+    "800": {
+      "bytes": 31098,
+      "width": 800,
+      "height": 450
+    }
+  },
+  {
+    "file": "owner-account-mismatch.jpg",
+    "originalBytes": 2201011,
+    "1600": {
+      "bytes": 135162,
+      "width": 1600,
+      "height": 900
+    },
+    "800": {
+      "bytes": 50316,
+      "width": 800,
+      "height": 450
+    }
+  },
+  {
+    "file": "contract-desk.jpg",
+    "originalBytes": 2210918,
+    "1600": {
+      "bytes": 141484,
+      "width": 1600,
+      "height": 900
+    },
+    "800": {
+      "bytes": 52678,
+      "width": 800,
+      "height": 450
+    }
+  },
+  {
+    "file": "contract-signing.jpg",
+    "originalBytes": 803831,
+    "1600": {
+      "bytes": 161604,
+      "width": 1365,
+      "height": 768
+    },
+    "800": {
+      "bytes": 71662,
+      "width": 800,
+      "height": 450
+    }
+  },
+  {
+    "file": "moving-day.jpg",
+    "originalBytes": 2267811,
+    "1600": {
+      "bytes": 114240,
+      "width": 1600,
+      "height": 900
+    },
+    "800": {
+      "bytes": 37062,
+      "width": 800,
+      "height": 450
+    }
+  },
+  {
+    "file": "account-change.jpg",
+    "originalBytes": 1994825,
+    "1600": {
+      "bytes": 79948,
+      "width": 1600,
+      "height": 900
+    },
+    "800": {
+      "bytes": 32508,
+      "width": 800,
+      "height": 450
+    }
+  },
+  {
+    "file": "balance-day.jpg",
+    "originalBytes": 2024334,
+    "1600": {
+      "bytes": 86836,
+      "width": 1600,
+      "height": 900
+    },
+    "800": {
+      "bytes": 31588,
+      "width": 800,
+      "height": 450
+    }
+  },
+  {
+    "file": "move-in-settlement.jpg",
+    "originalBytes": 2201398,
+    "1600": {
+      "bytes": 90030,
+      "width": 1600,
+      "height": 900
+    },
+    "800": {
+      "bytes": 29756,
+      "width": 800,
+      "height": 450
+    }
+  },
+  {
+    "file": "deposit-insurance.jpg",
+    "originalBytes": 2204348,
+    "1600": {
+      "bytes": 119992,
+      "width": 1600,
+      "height": 900
+    },
+    "800": {
+      "bytes": 47160,
+      "width": 800,
+      "height": 450
+    }
+  },
+  {
+    "file": "move-in-defect.jpg",
+    "originalBytes": 2506293,
+    "1600": {
+      "bytes": 164364,
+      "width": 1600,
+      "height": 900
+    },
+    "800": {
+      "bytes": 37396,
+      "width": 800,
+      "height": 450
+    }
+  }
+]

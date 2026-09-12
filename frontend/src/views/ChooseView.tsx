@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { DialogueBox, NextButton, SceneFrame } from "../components/Journal";
 import { StoryModal } from "../components/StoryModal";
 import { Icon } from "../components/Icon";
@@ -36,6 +37,7 @@ export function ChooseView({
   onNext: () => void;
   onBack: () => void;
 }) {
+  const [confirmContract, setConfirmContract] = useState<Contract | null>(null);
   if (page === "prologue")
     return (
       <SceneFrame background="app" context={prologueText[prologue]}>
@@ -91,7 +93,7 @@ export function ChooseView({
                 max-[600px]:p-[19px] max-[600px]:[&_strong]:text-[0.93rem] max-[600px]:[&_p]:text-[0.73rem]
                 max-[600px]:[&_[data-choice-icon]]:mb-3 `}
               aria-pressed={contract === type}
-              onClick={() => onChooseContract(type)}
+              onClick={() => setConfirmContract(type)}
             >
               <span
                 className="mb-[17px] flex size-[39px] items-center justify-center rounded-[11px] border border-line bg-soft text-accent [&_svg]:size-[21px]"
@@ -109,7 +111,7 @@ export function ChooseView({
         </div>
       ) : (
         <>
-          <div
+      <div
             className="mt-4 grid grid-cols-3 gap-[13px] max-[800px]:grid-cols-2 max-[600px]:mt-[13px] max-[600px]:gap-2.5"
             data-choices
           >
@@ -171,14 +173,14 @@ export function ChooseView({
         </>
       )}
       <div className="mt-6 flex justify-end">
-        <NextButton onClick={onNext}>
+        <NextButton onClick={contractPage ? () => setConfirmContract(contract) : onNext}>
           {contractPage ? "다음" : "이 집 보러 가기"}
         </NextButton>
       </div>
-      {page === "tutorial" && (
-        <StoryModal title={contractLabel(contract)} onClose={onNext}>
+      {confirmContract && (
+        <StoryModal title={contractLabel(confirmContract)} onClose={() => setConfirmContract(null)}>
           <div className="[&_p]:mt-3 [&_p]:rounded-[11px] [&_p]:border [&_p]:border-line [&_p]:bg-soft [&_p]:p-[15px] [&_p]:text-[0.84rem]">
-            {tutorials[contract].map((text) => (
+            {tutorials[confirmContract].map((text) => (
               <p key={text}>{text}</p>
             ))}
           </div>
@@ -186,7 +188,12 @@ export function ChooseView({
             className="mt-3 flex shrink-0 flex-wrap items-center justify-end gap-2.5 empty:mt-0 max-[600px]:mt-2.5"
             data-dialogue-actions
           >
-            <NextButton onClick={onNext}>확인하고 집 고르기</NextButton>
+            <button className="rounded-lg px-4 py-2 text-sm text-muted hover:text-accent" onClick={() => setConfirmContract(null)}>취소</button>
+            <NextButton onClick={() => {
+              onChooseContract(confirmContract);
+              setConfirmContract(null);
+              onNext();
+            }}>확인하고 집 고르기</NextButton>
           </div>
         </StoryModal>
       )}

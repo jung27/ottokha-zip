@@ -18,7 +18,7 @@ import {
   explorationScripts,
   contractScripts,
 } from "./src/data.ts";
-import { calculateMortgage, registryFinding, registryPoints } from "./src/registry.ts";
+import { inspectionGuide } from "./src/inspectionGuide.ts";
 import { advanceGame, canAdvanceStep, chooseAnswer, getSuccessExplanation, retryChoice, retryStep, submitChecks } from "./src/choiceFlow.ts";
 
 function finish(contract, house, mode) {
@@ -163,7 +163,7 @@ test("current stage five order ends with a mandatory moving checklist", () => {
   const steps = getSteps(makeNewGame());
   assert.deepEqual(
     steps.filter((step) => step.stage === 5).map((step) => step.id),
-    ["account", "timing", "registry-game", "settlement", "defect", "moving"],
+    ["account", "timing", "settlement", "defect", "moving"],
   );
   for (const removed of ["cost", "loan", "recap", "renewal", "return"])
     assert.ok(!steps.some((step) => step.id === removed));
@@ -259,28 +259,28 @@ test("main AI responses map to scenario ids and reject incomplete or impossible 
     assert.throws(() => parseRecommendation(value));
 });
 
-test("registry game appears on every route and requires finding the new mortgage date", () => {
-  for (const home of homes) {
-    const step = getSteps({ ...makeNewGame(), house: home.id }).find((s) => s.id === "registry-game");
-    assert.equal(step.kind, "registry");
-    assert.deepEqual(step.items.map((p) => p.title), ["소유자 이름", "소유권 이전 날짜", "신탁 표기", "근저당권 설정 날짜", "채권최고액", "근저당권자"]);
-    assert.equal(hasRequiredItems(step, []), false);
-    assert.equal(hasRequiredItems(step, registryPoints.filter((p) => p.id !== "mortgage-date").map((p) => p.id)), false);
-    assert.equal(hasRequiredItems(step, ["mortgage-date"]), true);
-    assert.match(registryFinding.text, /계약을 해지/);
+test("all routes skip the removed registry game and continue to settlement", () => {
+  for (const contract of ["monthly", "jeonse"]) for (const home of homes) {
+    if (contract === "jeonse" && home.jeonse === null) continue;
+    const steps = getSteps({ ...makeNewGame(), contract, house: home.id });
+    assert.equal(steps.some((step) => step.id === "registry-game" || step.kind === "registry"), false);
+    const timing = steps.findIndex((step) => step.id === "timing");
+    assert.equal(steps[timing + 1].id, "settlement");
   }
 });
 
-test("mortgage exercise calculates ratios and rejects incomplete or invalid input", () => {
-  assert.deepEqual(calculateMortgage(20000, 12000, 120, 8000), { estimatedLoan: 10000, claimRatio: 60, combinedRatio: 100 });
-  assert.equal(calculateMortgage(20000, 11000, 110, 0).estimatedLoan, 10000);
-  assert.equal(calculateMortgage(20000, 13000, 130, 0).estimatedLoan, 10000);
-  for (const args of [[0,12000,120,8000], [20000,-1,120,8000], [20000,12000,109,8000], [20000,12000,131,8000], [20000,12000,120,-1], [NaN,12000,120,8000], [Infinity,12000,120,8000]])
-    assert.equal(calculateMortgage(...args), null);
+test("every inspection point explains why, how, good condition and warning signals", () => {
+  for (const home of homes) for (const item of inspectionItems(home.id)) {
+    const guide = inspectionGuide(item);
+    assert.ok(guide.reason.trim());
+    assert.ok(guide.good.trim());
+    assert.equal(guide.method, item.description);
+    assert.equal(guide.warning, item.signal);
+  }
 });
 
 test("review retains common tips, oral warning and the actual safe result without duplicate risk counts", () => {
-  const game = { ...makeNewGame(), answers: { inspection: inspectionItems("oneroom").map((i) => i.id), deposit: ["owner"], proxy: ["authority"], clauses: [], defect: ["record"], "registry-game": ["mortgage-date"] } };
+  const game = { ...makeNewGame(), answers: { inspection: inspectionItems("oneroom").map((i) => i.id), deposit: ["owner"], proxy: ["authority"], clauses: [], defect: ["record"] } };
   const notes = getCheckpoints(game);
   assert.match(notes.find((n) => n.id === "inspection:notice").consequence, /시간대를 바꿔 두 번/);
   assert.match(notes.find((n) => n.id === "clauses:notice").consequence, /거절당한다면/);
@@ -293,7 +293,7 @@ test("review retains common tips, oral warning and the actual safe result withou
   assert.match(proxy.explanation.text, /가족 관계는 대리권과 별개/);
   assert.equal(proxy.showFeedback, false);
   assert.equal(notes.find((n) => n.id === "defect").title, "시설물 수리 특약이 없다면");
-  assert.ok(notes.some((n) => n.id === "registry-game:finding"));
+  assert.equal(notes.some((n) => n.stepId === "registry-game"), false);
   assert.equal(notes.filter(isRiskCheckpoint).length, 3);
   game.answers.clauses = ["repair"];
   const resolved = getCheckpoints(game).find((n) => n.id === "defect");

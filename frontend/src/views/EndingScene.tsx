@@ -1,5 +1,5 @@
 import { NextButton } from "../components/Journal";
-import { scenePhotos } from "../scenePhotos";
+import { scenePhotos, sceneImageSizes } from "../scenePhotos";
 import type { Home } from "../types";
 
 export function EndingScene({
@@ -14,7 +14,7 @@ export function EndingScene({
       <p className="mb-2 text-sm font-semibold text-accent">나의 첫 {home.name}</p>
       <h1 className="mb-6">수많은 우여곡절 끝에 집을 구했다!</h1>
       <div className="relative overflow-hidden rounded-2xl bg-soft">
-        <img className="aspect-video w-full object-cover" src={scenePhotos[home.id].src} alt={scenePhotos[home.id].description} />
+        <img className="aspect-video w-full object-cover" src={scenePhotos[home.id].src} srcSet={scenePhotos[home.id].srcSet} sizes={sceneImageSizes} decoding="async" alt={scenePhotos[home.id].description} />
         <svg className="absolute right-[8%] bottom-0 h-[88%] max-w-[45%] drop-shadow-lg" viewBox="0 0 240 360" role="img" aria-label="새 집 앞에서 열쇠를 들고 두 팔을 올리며 기뻐하는 사람">
           <path d="M89 252 83 350M145 252l17 98" stroke="#273e3a" strokeWidth="32" strokeLinecap="round" />
           <path d="m94 150-37-34-23-56m109 90 42-39 23-59" fill="none" stroke="#f0d5b5" strokeWidth="24" strokeLinecap="round" />

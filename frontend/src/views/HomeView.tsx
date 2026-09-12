@@ -62,7 +62,6 @@ export function HomeView({
   onStartWithAI,
   ending,
   notes = [],
-  onReplay,
   onSameHome,
   onOtherHome,
   onAppendix,
@@ -74,7 +73,6 @@ export function HomeView({
   onStartWithAI: (input: string, signal: AbortSignal) => Promise<void>;
   ending?: Ending;
   notes?: Checkpoint[];
-  onReplay: (step: string) => void;
   onSameHome: () => void;
   onOtherHome: () => void;
   onAppendix: () => void;
@@ -245,16 +243,6 @@ export function HomeView({
         >
           <div className="mb-[15px] flex items-center justify-between gap-3.5 [&_h2]:text-[1.13rem] [&_button]:px-3 [&_button]:py-[9px] [&_button]:text-[0.72rem]">
             <h2>{STAGES.find((item) => item.id === stage)?.title}</h2>
-            <button
-              className={`inline-flex min-h-[42px] items-center justify-center gap-[9px] rounded-[10px] px-[18px] py-[11px]
-                text-[0.79rem] font-[650] leading-[1.45] whitespace-normal transition-[background,border-color]
-                duration-150 ease-[ease] [&_svg]:size-4 [&_svg]:shrink-0 max-[600px]:min-h-10 max-[600px]:px-3.5
-                max-[600px]:py-2.5 max-[600px]:text-[0.74rem] border border-line bg-surface text-ink
-                enabled:hover:border-accent enabled:hover:bg-accent-soft`}
-              onClick={() => onReplay(stageNotes[0]?.stepId ?? "listing")}
-            >
-              <Icon name="reset" />이 단계 다시 보기
-            </button>
           </div>
           <ReviewCards notes={stageNotes} />
         </section>

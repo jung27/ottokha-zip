@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { OnboardingModal } from "./components/OnboardingModal";
 import { Header } from "./components/Header";
+import { StageBar } from "./components/StageBar";
 import { SceneImagePreloader } from "./components/Journal";
 import { AppModals } from "./components/modals/AppModals";
 import {
@@ -9,7 +10,6 @@ import {
   getEnding,
   getSteps,
   makeNewGame,
-  rewindGame,
   selectedHome,
 } from "./data";
 import {
@@ -22,7 +22,6 @@ import { DocumentView } from "./views/DocumentView";
 import { ExploreView } from "./views/ExploreView";
 import { HomeView } from "./views/HomeView";
 import { TalkView } from "./views/TalkView";
-import { RegistryView } from "./views/RegistryView";
 import { EndingScene } from "./views/EndingScene";
 import { advanceGame, chooseAnswer, getSuccessExplanation, retryStep, submitChecks } from "./choiceFlow";
 
@@ -34,7 +33,6 @@ export default function App() {
   const [game, setGame] = useState<GameState>(makeNewGame);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [showHome, setShowHome] = useState(false);
-  const [replayVersion, setReplayVersion] = useState(0);
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [showOnboarding, setShowOnboarding] = useState(true);
   const [recommendation, setRecommendation] = useState("");
@@ -189,14 +187,6 @@ export default function App() {
     }));
   }
 
-  function replay(stepId: string) {
-    setReviewOpen(false);
-    setGame((previous) => rewindGame(previous, stepId));
-    setReplayVersion((version) => version + 1);
-    setShowHome(false);
-    setModal(null);
-  }
-
   function choose(id: string) {
     setGame((previous) => chooseAnswer(previous, step.id, id));
   }
@@ -232,8 +222,7 @@ export default function App() {
           ? { ...previous, prologue: previous.prologue + 1 }
           : { ...previous, page: "contract" };
       if (previous.page === "contract")
-        return { ...previous, page: "tutorial" };
-      if (previous.page === "tutorial") return { ...previous, page: "house" };
+        return { ...previous, page: "house" };
       if (previous.contract === "jeonse" && previous.house === "goshiwon")
         return previous;
       return { ...previous, page: "play", cursor: "listing" };
@@ -263,7 +252,6 @@ export default function App() {
         ? setModal("conditions")
         : restart("other"),
     onResume: () => setShowHome(false),
-    onReplay: replay,
     onSameHome: () => restart("same"),
     onOtherHome: () => restart("other"),
     onStartWithAI: handleStartWithAI,
@@ -272,7 +260,10 @@ export default function App() {
 
   return (
     <div className="min-h-svh">
-      <SceneImagePreloader />
+      <SceneImagePreloader backgrounds={game.page === "play" && !isHome
+        ? [step.background, ...step.beats.map((beat) => beat.background ?? step.background),
+          ...(steps[index + 1] ? [steps[index + 1].beats[0]?.background ?? steps[index + 1].background] : [])]
+        : ["app", "message", "office"]} />
       <Header
         onHome={() => setShowHome(true)}
         onGuide={() => setShowOnboarding(true)}
@@ -285,6 +276,7 @@ export default function App() {
         className={`mx-auto w-[min(1184px,100%)] px-7 pt-2.5 pb-[30px] outline-none has-[[data-scene]]:w-[min(1344px,100%)]
         max-[800px]:px-5 max-[600px]:px-3 max-[600px]:pt-1.5 max-[600px]:pb-5`}
       >
+        {!isHome && game.page === "play" && <StageBar stage={step.stage} />}
         {isHome ? (
           <HomeView {...homeProps} />
         ) : ending ? (
@@ -325,20 +317,16 @@ export default function App() {
                 page:
                   previous.page === "house"
                     ? "contract"
-                    : previous.page === "tutorial"
-                      ? "contract"
-                      : "prologue",
+                    : "prologue",
               }))
             }
           />
         ) : (
           <>
             <div>
-              <div key={step.id + ":" + replayVersion}>
+              <div key={step.id}>
                 {step.kind === "inspection" ? (
                   <ExploreView {...playProps} />
-                ) : step.kind === "registry" ? (
-                  <RegistryView {...playProps} home={home} contract={game.contract} />
                 ) : step.kind === "checklist" ||
                   step.document === "registry" ||
                   step.document === "lease" ? (
