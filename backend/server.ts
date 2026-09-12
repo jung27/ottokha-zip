@@ -20,6 +20,14 @@ async function processText(text: string) {
   return { first: pair?.[0], second: pair?.[1] };
 }
 
+async function summarize(text: string) {
+  const interaction = await ai.interactions.create({
+    model: "gemini-3.5-flash-lite",
+    input: `${text} / 이것들은 사용자가 주거 계약을 맺을 때 특히 주의해야할 요소들이야 최대한 간단하게 200자 이내로 요약해줘. 오로지 줄글로만 써줘. 빠진 내용이 없게 해.`,
+  });
+  return interaction.output_text;
+}
+
 const app: Express = express();
 
 app.use(cors());
@@ -32,6 +40,16 @@ app.get("/api", async (req: Request, res: Response) => {
   const result = await processText(text);
   console.log("Processed result:", result);
   res.json(result);
+});
+
+app.get("/api/summarize", async (req: Request, res: Response) => {
+  const text = req.query.text as string;
+  if (!text) {
+    return res.status(400).json({ error: "Text parameter is required" });
+  }
+  const result = await summarize(text);
+  console.log("Processed result:", result);
+  res.json({ summary: result });
 });
 
 if (process.env.NODE_ENV !== "production") {
