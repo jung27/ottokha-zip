@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { DialogueBox, NextButton, SceneFrame } from "../components/Journal";
 import { ScenePopup } from "../components/StoryModal";
 import type { Checkpoint, PlayViewProps } from "../types";
@@ -7,10 +7,12 @@ export function FeedbackPanel({
   feedback,
   onNext,
   onRetry,
+  retryOnly = false,
 }: {
   feedback: Checkpoint[];
   onNext: () => void;
   onRetry: () => void;
+  retryOnly?: boolean;
 }) {
   const [index, setIndex] = useState(0);
   const cards = [
@@ -27,6 +29,7 @@ export function FeedbackPanel({
   ];
   const current = cards[index];
   if (!current) return null;
+  const mustRetry = retryOnly || current.risk;
   const proceed = () =>
     index < cards.length - 1 ? setIndex(index + 1) : onNext();
   return (
@@ -34,7 +37,8 @@ export function FeedbackPanel({
       key={current.id}
       title={current.title}
       alert={current.risk}
-      onClose={proceed}
+      onClose={mustRetry ? onRetry : proceed}
+      hideClose={mustRetry}
       actions={
         <>
           <button
@@ -46,7 +50,7 @@ export function FeedbackPanel({
           >
             다시 선택
           </button>
-          <NextButton onClick={proceed} />
+          {!mustRetry && <NextButton onClick={proceed} />}
         </>
       }
     >
@@ -67,6 +71,13 @@ export function FeedbackPanel({
           <p>{current.advice}</p>
         </div>
       )}
+      {mustRetry && cards.filter((card) => card.risk && card.id !== current.id).map((card) => (
+        <div key={card.id} className="mt-4 border-t border-line pt-4 text-xs leading-relaxed">
+          <h3 className="mb-2 font-bold text-risk">{card.title}</h3>
+          <p className="whitespace-pre-line">{card.text}</p>
+          {card.advice && <p className="mt-2 whitespace-pre-line">{card.advice}</p>}
+        </div>
+      ))}
     </ScenePopup>
   );
 }
@@ -76,27 +87,36 @@ export function TalkView({
   selected,
   answered,
   feedback,
+  attempted,
+  successText,
   onChoose,
   onNext,
   onRetry,
   scene,
 }: PlayViewProps & { scene?: ReactNode }) {
   const [line, setLine] = useState(0);
+  const [transitioning, setTransitioning] = useState(false);
+  useEffect(() => {
+    if (!transitioning) return;
+    const timer = window.setTimeout(onNext, 1600);
+    return () => window.clearTimeout(timer);
+  }, [transitioning, onNext]);
   const current = step.beats[answered ? step.beats.length - 1 : line];
   const lastLine = line >= step.beats.length - 1;
   const chosen = step.choices?.find((choice) => selected.includes(choice.id));
-  const warning = answered && feedback.some((item) => item.showFeedback);
+  const warning = answered && chosen?.status === "risk";
+  const correct = answered && chosen?.status === "checked";
   const context = [
     current.text,
     ...(lastLine ? (step.choices?.map((choice) => choice.label) ?? []) : []),
   ].join(" ");
-  const choices = lastLine && !answered && step.choices && (
+  const choices = (lastLine || answered) && step.choices && (
     <div
       className={`min-h-0 max-h-full w-[min(680px,100%)] shrink overflow-y-auto rounded-2xl border
       border-[color-mix(in_srgb,var(--color-surface)_70%,var(--color-line))] bg-surface/68 p-3.5
       shadow-[0_8px_28px_#152b2420] backdrop-blur-[12px] [scrollbar-width:thin] [&_[data-choices]]:m-0
       [&_[data-choices]]:grid-cols-[minmax(0,1fr)] [&_[data-choices]]:gap-2 [&_[data-choice]]:items-center
-      [&_[data-choice]]:bg-surface/45 [&_[data-choice]]:px-3.5 [&_[data-choice]]:py-3
+      [&_[data-choice]]:px-3.5 [&_[data-choice]]:py-3
       [&_[data-choice]]:text-[0.85rem] [&_[data-choice]]:leading-[1.75]
       [&_[data-choice]:enabled:hover]:border-accent [&_[data-choice]:enabled:hover]:bg-selected/88
       [&_[data-choice]:focus-visible]:border-accent [&_[data-choice]:focus-visible]:bg-selected/88
@@ -111,29 +131,39 @@ export function TalkView({
         className="mt-4 grid grid-cols-2 gap-2 max-[600px]:mt-[13px] max-[600px]:grid-cols-1 max-[600px]:gap-[7px]"
         data-choices
       >
-        {step.choices.map((choice, index) => (
+        {step.choices.map((choice, index) => {
+          const triedWrong = attempted.includes(choice.id) && choice.status === "risk";
+          const selectedCorrect = correct && selected.includes(choice.id);
+          return (
           <button
             key={choice.id}
-            className={`flex items-start gap-[11px] rounded-[10px] border border-line bg-soft px-3.5 py-[11px] text-left
+            className={`flex items-start gap-[11px] rounded-[10px] border border-line bg-surface/45 px-3.5 py-[11px] text-left
               text-[0.77rem] leading-[1.8] text-ink enabled:hover:border-accent enabled:hover:bg-accent-soft
               [&_small]:mt-[3px] [&_small]:block [&_small]:text-[0.68rem] [&_small]:text-muted max-[600px]:px-[11px]
-              max-[600px]:py-[9px] max-[600px]:text-[0.73rem]`}
+              max-[600px]:py-[9px] max-[600px]:text-[0.73rem]
+              data-[choice-state=wrong]:border-[#aab0b4] data-[choice-state=wrong]:bg-[#e5e7eb]
+              data-[choice-state=wrong]:text-[#626b73] data-[choice-state=wrong]:opacity-100
+              data-[choice-state=correct]:border-[#2f7d4d] data-[choice-state=correct]:bg-[#d9f0df]
+              data-[choice-state=correct]:text-[#185c32] data-[choice-state=correct]:opacity-100`}
             data-choice
-            disabled={!!choice.disabledReason}
+            data-choice-state={selectedCorrect ? "correct" : triedWrong ? "wrong" : "available"}
+            aria-pressed={selectedCorrect}
+            disabled={answered || triedWrong || !!choice.disabledReason}
             onClick={() => onChoose(choice.id)}
           >
             <span
               className="mt-px grid h-[21px] min-w-[19px] place-items-center rounded-[5px] border border-line bg-surface text-[0.64rem] text-muted"
               data-choice-index
             >
-              {index + 1}
+              {selectedCorrect ? "✓" : index + 1}
             </span>
             <span>
               {choice.label}
               {choice.disabledReason && <small>{choice.disabledReason}</small>}
             </span>
           </button>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -163,27 +193,35 @@ export function TalkView({
             feedback={feedback}
             onNext={onNext}
             onRetry={onRetry}
+            retryOnly
           />
         ) : undefined
       }
     >
       <DialogueBox
-        speaker={answered && !warning ? undefined : current.speaker}
+        speaker={answered ? undefined : current.speaker}
         text={
-          answered && !warning
-            ? (chosen?.feedback.text ?? current.text)
-            : current.text
+          transitioning ? "다음 단계로 넘어갑니다."
+            : correct ? undefined : current.text
         }
         actions={
-          answered ? (
-            <NextButton onClick={onNext} disabled={warning} />
+          warning || transitioning ? null : correct ? (
+            <NextButton onClick={() => setTransitioning(true)} />
           ) : !lastLine ? (
             <NextButton onClick={() => setLine(line + 1)} />
           ) : !step.choices ? (
             <NextButton onClick={onNext} />
           ) : null
         }
-      />
+      >
+        {correct && !transitioning && (
+          <p className="animate-reveal text-[0.97rem] leading-[1.95] whitespace-pre-line max-[600px]:text-[0.88rem]" aria-live="polite" data-success-feedback>
+            <strong className="font-bold text-accent">잘 하셨습니다</strong>
+            <br /><br />
+            {successText}
+          </p>
+        )}
+      </DialogueBox>
     </SceneFrame>
   );
 }

@@ -118,6 +118,8 @@ export type PlayViewProps = {
   answered: boolean;
   notes: Checkpoint[];
   feedback: Checkpoint[];
+  attempted: string[];
+  successText: string;
   onChoose: (id: string) => void;
   onToggle: (id: string) => void;
   onSubmit: () => void;
@@ -133,6 +135,7 @@ export type GameState = {
   cursor: string;
   answers: Record<string, string[]>;
   drafts: Record<string, string[]>;
+  attempts: Record<string, string[]>;
 };
 export type Ending = {
   id: "complete";

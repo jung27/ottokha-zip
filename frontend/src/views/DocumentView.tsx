@@ -186,8 +186,8 @@ export function DocumentView(
               : current.text
         }
         actions={
-          answered ? (
-            <NextButton onClick={onNext} disabled={showFeedback} />
+          showFeedback ? null : answered ? (
+            <NextButton onClick={onNext} />
           ) : interactive ? (
             <NextButton
               onClick={onSubmit}

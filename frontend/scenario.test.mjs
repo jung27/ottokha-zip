@@ -19,9 +19,10 @@ import {
   contractScripts,
 } from "./src/data.ts";
 import { calculateMortgage, registryFinding, registryPoints } from "./src/registry.ts";
+import { advanceGame, canAdvanceStep, chooseAnswer, getSuccessExplanation, retryChoice, retryStep, submitChecks } from "./src/choiceFlow.ts";
 
 function finish(contract, house, mode) {
-  const game = { ...makeNewGame(), page: "play", contract, house };
+  let game = { ...makeNewGame(), page: "play", contract, house };
   const visited = [];
   for (let guard = 0; guard < 30; guard++) {
     const steps = getSteps(game);
@@ -42,18 +43,31 @@ function finish(contract, house, mode) {
         (item) => item.status === desired && !item.disabledReason,
       );
       assert.ok(choice);
-      game.answers[step.id] = [choice.id];
+      game = chooseAnswer(game, step.id, choice.id);
       const feedback = getCheckpoints(game).filter(
         (item) => item.stepId === step.id,
       );
       assert.equal(feedback.length, 1);
       assert.equal(feedback[0].status, choice.status);
       assert.equal(feedback[0].choice, choice.label);
+      if (choice.status === "risk") {
+        assert.equal(canAdvanceStep(game, step), false);
+        assert.equal(advanceGame(game, step.id), game);
+        game = retryChoice(game, step.id);
+        assert.equal(game.cursor, step.id);
+        assert.equal(game.answers[step.id], undefined);
+        assert.equal(chooseAnswer(game, step.id, choice.id), game);
+        const correct = step.choices.find((item) => item.status === "checked" && !item.disabledReason);
+        game = chooseAnswer(game, step.id, correct.id);
+        assert.equal(getCheckpoints(game).filter((item) => item.stepId === step.id).length, 2);
+      }
+      assert.equal(canAdvanceStep(game, step), true);
     } else if (step.items) {
-      game.answers[step.id] =
+      game.drafts[step.id] =
         mode === "risk" && !step.requireAll
           ? (step.requiredItems ?? [])
           : step.items.map((item) => item.id);
+      game = submitChecks(game, step.id);
       assert.equal(hasRequiredItems(step, game.answers[step.id]), true);
       const missing = step.items.filter(
         (item) => !game.answers[step.id].includes(item.id),
@@ -64,11 +78,18 @@ function finish(contract, house, mode) {
         ).length,
         missing.length,
       );
+      if (!canAdvanceStep(game, step)) {
+        assert.equal(advanceGame(game, step.id), game);
+        const prior = game.answers[step.id];
+        game = retryStep(game, step.id);
+        assert.deepEqual(game.drafts[step.id], prior);
+        game.drafts[step.id] = step.items.map((item) => item.id);
+        game = submitChecks(game, step.id);
+        assert.equal(canAdvanceStep(game, step), true);
+      }
     } else game.answers[step.id] = ["read"];
-    const updated = getSteps(game);
-    const next = updated[updated.findIndex((item) => item.id === step.id) + 1];
-    if (!next) {
-      game.page = "ending";
+    game = advanceGame(game, step.id);
+    if (game.page === "ending") {
       assert.deepEqual(
         [...new Set(visited.map((item) => item.stage))],
         [1, 2, 3, 4, 5],
@@ -77,7 +98,6 @@ function finish(contract, house, mode) {
       assert.equal(visited.at(-1).id, "moving");
       return game;
     }
-    game.cursor = next.id;
   }
   assert.fail("Story did not reach its single ending");
 }
@@ -271,7 +291,7 @@ test("review retains common tips, oral warning and the actual safe result withou
   assert.match(proxy.consequence, /인감증명서 발급일/);
   assert.match(proxy.consequence, /소유자 명의 계좌/);
   assert.match(proxy.explanation.text, /가족 관계는 대리권과 별개/);
-  assert.equal(proxy.showFeedback, true);
+  assert.equal(proxy.showFeedback, false);
   assert.equal(notes.find((n) => n.id === "defect").title, "시설물 수리 특약이 없다면");
   assert.ok(notes.some((n) => n.id === "registry-game:finding"));
   assert.equal(notes.filter(isRiskCheckpoint).length, 3);
@@ -335,5 +355,80 @@ test("a new visit gets independent empty state even after a completed run", () =
   assert.equal(fresh.cursor, "listing");
   assert.deepEqual(fresh.answers, {});
   assert.deepEqual(fresh.drafts, {});
+  assert.deepEqual(fresh.attempts, {});
   assert.notEqual(fresh.answers, completed.answers);
+});
+
+test("each wrong choice stays disabled after retry and all attempts survive the correct answer", () => {
+  for (const home of homes) {
+    let game = { ...makeNewGame(), page: "play", house: home.id, cursor: "house-search" };
+    const step = getSteps(game).find((item) => item.id === game.cursor);
+    const wrong = step.choices.filter((choice) => choice.status === "risk");
+    for (const choice of wrong) {
+      game = chooseAnswer(game, step.id, choice.id);
+      assert.equal(advanceGame(game, step.id), game);
+      assert.equal(chooseAnswer(game, step.id, "verify"), game);
+      game = retryChoice(game, step.id);
+      for (const id of game.attempts[step.id]) assert.equal(chooseAnswer(game, step.id, id), game);
+    }
+    const correct = step.choices.find((choice) => choice.status === "checked");
+    game = chooseAnswer(game, step.id, correct.id);
+    assert.equal(game.attempts[step.id].length, 4);
+    assert.equal(retryChoice(game, step.id), game);
+    assert.equal(chooseAnswer(game, step.id, wrong[0].id), game);
+    const notes = getCheckpoints(game).filter((note) => note.stepId === step.id);
+    assert.equal(notes.filter(isRiskCheckpoint).length, 3);
+    assert.equal(notes.filter((note) => note.showFeedback).length, 0);
+    assert.match(getSuccessExplanation(game, step), /선택이 좋습니다/);
+    assert.ok(getSuccessExplanation(game, step).includes(correct.feedback.text));
+    assert.equal(advanceGame(game, step.id).cursor, "inspection");
+    assert.equal(advanceGame(advanceGame(game, step.id), step.id).cursor, "inspection");
+  }
+});
+
+test("retrying does not rewind earlier progress, while an explicit stage replay clears attempts", () => {
+  let game = finish("monthly", "oneroom", "risk");
+  const replay = rewindGame(game, "deposit");
+  assert.deepEqual(replay.attempts.listing, game.attempts.listing);
+  assert.equal(replay.attempts.deposit, undefined);
+  assert.equal(replay.attempts.proxy, undefined);
+  const before = replay.answers.inspection;
+  game = chooseAnswer(replay, "deposit", "immediate");
+  game = retryChoice(game, "deposit");
+  assert.equal(game.answers.inspection, before);
+  assert.equal(game.cursor, "deposit");
+  assert.deepEqual(game.attempts.deposit, ["immediate"]);
+  assert.equal(canAdvanceStep(game, getSteps(game).find((step) => step.id === "deposit")), false);
+});
+
+test("every correct choice has positive, scenario-specific feedback", () => {
+  for (const contract of ["monthly", "jeonse"]) {
+    for (const home of homes.filter((item) => contract === "monthly" || item.jeonse !== null)) {
+      const game = finish(contract, home.id, "checked");
+      for (const step of getSteps(game).filter((item) => item.choices)) {
+        const text = getSuccessExplanation(game, step);
+        assert.match(text, /점이 좋습니다|선택이 좋습니다/, `${contract}/${home.id}/${step.id}`);
+        assert.ok(text.length > 30);
+        const choice = step.choices.find((item) => item.status === "checked");
+        assert.ok(text.includes(choice.feedback.text));
+      }
+    }
+  }
+});
+
+test("warning checklists require correction without resetting selections or losing mistake history", () => {
+  let game = { ...makeNewGame(), page: "play", contract: "jeonse", cursor: "signing", drafts: { signing: ["identity"] } };
+  const step = getSteps(game).find((item) => item.id === "signing");
+  game = submitChecks(game, step.id);
+  assert.equal(advanceGame(game, step.id), game);
+  assert.deepEqual(game.attempts.signing, ["tax"]);
+  game = retryStep(game, step.id);
+  assert.equal(game.cursor, "signing");
+  assert.deepEqual(game.drafts.signing, ["identity"]);
+  game.drafts.signing.push("tax");
+  game = submitChecks(game, step.id);
+  assert.equal(canAdvanceStep(game, step), true);
+  assert.equal(getCheckpoints(game).filter(isRiskCheckpoint).length, 1);
+  assert.equal(getCheckpoints(game).filter((note) => note.showFeedback).length, 0);
+  assert.equal(advanceGame(game, step.id).cursor, "account");
 });

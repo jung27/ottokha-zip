@@ -8,7 +8,6 @@ import {
   getCheckpoints,
   getEnding,
   getSteps,
-  hasRequiredItems,
   makeNewGame,
   rewindGame,
   selectedHome,
@@ -25,6 +24,7 @@ import { HomeView } from "./views/HomeView";
 import { TalkView } from "./views/TalkView";
 import { RegistryView } from "./views/RegistryView";
 import { EndingScene } from "./views/EndingScene";
+import { advanceGame, chooseAnswer, getSuccessExplanation, retryStep, submitChecks } from "./choiceFlow";
 
 const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL || "http://localhost"
@@ -38,7 +38,6 @@ export default function App() {
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [showOnboarding, setShowOnboarding] = useState(true);
   const [recommendation, setRecommendation] = useState("");
-  const [isAiFlow, setIsAiFlow] = useState(false);
 
   useEffect(() => {
     if (!recommendation) return;
@@ -80,7 +79,6 @@ export default function App() {
       const homeName = selectedHome(newGame).name;
 
       setGame(newGame);
-      setIsAiFlow(true);
       setRecommendation(
         `AI가 '${contractLabelText} · ${homeName}' 조건을 추천했습니다.`,
       );
@@ -182,7 +180,6 @@ export default function App() {
     setModal(null);
     setShowHome(false);
     setRecommendation("");
-    setIsAiFlow(false);
     setGame((previous) => ({
       ...makeNewGame(),
       page:
@@ -201,17 +198,7 @@ export default function App() {
   }
 
   function choose(id: string) {
-    if (
-      answered ||
-      !step.choices?.some(
-        (choice) => choice.id === id && !choice.disabledReason,
-      )
-    )
-      return;
-    setGame((previous) => ({
-      ...previous,
-      answers: { ...previous.answers, [step.id]: [id] },
-    }));
+    setGame((previous) => chooseAnswer(previous, step.id, id));
   }
 
   function toggle(id: string) {
@@ -231,37 +218,11 @@ export default function App() {
   }
 
   function submit() {
-    if (!hasRequiredItems(step, selected)) return;
-    if (!answered)
-      setGame((previous) => ({
-        ...previous,
-        answers: {
-          ...previous.answers,
-          [step.id]: previous.drafts[step.id] ?? [],
-        },
-      }));
+    setGame((previous) => submitChecks(previous, step.id));
   }
 
   function next() {
-    if (!hasRequiredItems(step, selected)) return;
-    if (step.kind !== "info" && step.kind !== "recap" && !answered) return;
-    setGame((previous) => {
-      const updated = {
-        ...previous,
-        answers: {
-          ...previous.answers,
-          [step.id]: previous.answers[step.id] ?? ["read"],
-        },
-      };
-      const currentSteps = getSteps(updated);
-      const nextStep =
-        currentSteps[currentSteps.findIndex((item) => item.id === step.id) + 1];
-      return {
-        ...updated,
-        page: nextStep ? "play" : "ending",
-        cursor: nextStep?.id ?? step.id,
-      };
-    });
+    setGame((previous) => advanceGame(previous, step.id));
   }
 
   function setupNext() {
@@ -285,11 +246,13 @@ export default function App() {
     answered,
     notes,
     feedback,
+    attempted: game.attempts[step.id] ?? [],
+    successText: getSuccessExplanation(game, step),
     onChoose: choose,
     onToggle: toggle,
     onSubmit: submit,
     onNext: next,
-    onRetry: () => replay(step.id),
+    onRetry: () => setGame((previous) => retryStep(previous, step.id)),
   };
 
   const homeProps = {
@@ -361,9 +324,7 @@ export default function App() {
                 ...previous,
                 page:
                   previous.page === "house"
-                    ? isAiFlow
-                      ? "home"
-                      : "tutorial"
+                    ? "contract"
                     : previous.page === "tutorial"
                       ? "contract"
                       : "prologue",

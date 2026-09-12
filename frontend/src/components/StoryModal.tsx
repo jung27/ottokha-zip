@@ -52,6 +52,7 @@ export function ScenePopup({
   alert = false,
   className = "",
   dictionary = false,
+  hideClose = false,
 }: {
   title: string;
   onClose: () => void;
@@ -60,6 +61,7 @@ export function ScenePopup({
   alert?: boolean;
   className?: string;
   dictionary?: boolean;
+  hideClose?: boolean;
 }) {
   const panel = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -133,13 +135,13 @@ export function ScenePopup({
             <Icon name={alert ? "info" : "book"} />
           </span>
           <h2>{title}</h2>
-          <button
+          {!hideClose && <button
             className="grid size-8 shrink-0 place-items-center rounded-[9px] text-muted hover:bg-soft hover:text-ink [&_svg]:size-[17px]"
             onClick={onClose}
             aria-label="닫기"
           >
             <Icon name="close" />
-          </button>
+          </button>}
         </div>
         <div className="min-h-0 overflow-y-auto px-5 pb-4 [scrollbar-width:thin] group-data-[dictionary=true]/popup:pb-5 max-[600px]:px-[13px] max-[600px]:pb-3">
           {children}

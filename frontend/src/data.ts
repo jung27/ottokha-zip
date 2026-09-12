@@ -1200,6 +1200,7 @@ export const makeNewGame = (): GameState => ({
   cursor: "listing",
   answers: {},
   drafts: {},
+  attempts: {},
 });
 
 export function clauseItems(contract: Contract): CheckItem[] {
@@ -1807,35 +1808,40 @@ export function isRiskCheckpoint(note: Checkpoint): boolean {
 export function getCheckpoints(g: GameState): Checkpoint[] {
   return getSteps(g).flatMap<Checkpoint>((step) => {
     const selected = g.answers[step.id];
-    if (!selected) return [];
     if (step.choices) {
-      const choice = step.choices.find((c) => selected.includes(c.id));
-      if (!choice) return [];
-      return [{
-        id: step.id, stepId: step.id, stage: step.stage, status: choice.status,
-        title: choice.status === "risk" || choice.resultCard ? choice.feedback.title : step.title,
-        choice: choice.label,
-        consequence: choice.status === "checked" && !choice.resultCard
-          ? (step.explanation?.text ?? choice.feedback.text) : choice.feedback.text,
-        advice: choice.resultCard ? choice.feedback.advice : (step.explanation?.advice || choice.feedback.advice),
-        explanation: choice.resultCard ? step.explanation : undefined,
-        showFeedback: choice.status === "risk" || choice.resultCard === true,
-        category: "decision",
-      }];
+      const attempted = [...new Set([...(g.attempts[step.id] ?? []), ...(selected ?? [])])];
+      return attempted.flatMap<Checkpoint>((id) => {
+        const choice = step.choices?.find((item) => item.id === id);
+        if (!choice) return [];
+        return [{
+          id: choice.status === "risk" ? `${step.id}:attempt:${id}` : step.id,
+          stepId: step.id,
+          stage: step.stage,
+          status: choice.status,
+          title: choice.status === "risk" || choice.resultCard ? choice.feedback.title : step.title,
+          choice: choice.label,
+          consequence: choice.status === "checked" && !choice.resultCard
+            ? (step.explanation?.text ?? choice.feedback.text) : choice.feedback.text,
+          advice: choice.resultCard ? choice.feedback.advice : (step.explanation?.advice || choice.feedback.advice),
+          explanation: choice.resultCard ? step.explanation : undefined,
+          showFeedback: choice.status === "risk" && !!selected?.includes(id),
+          category: "decision",
+        }];
+      });
     }
+    if (!selected) return [];
     if (step.kind === "info") return [{
       id: step.id, stepId: step.id, stage: step.stage, status: "checked",
       title: step.title, choice: "서류를 확인했다",
       consequence: step.beats.map((beat) => beat.text).join("\n"),
       advice: "", category: "check",
     }];
-    const notes: Checkpoint[] = (step.items ?? []).map((item) => {
+    const itemCheckpoint = (item: CheckItem, checked: boolean): Checkpoint => {
       const special = step.id === "signing" && item.id === "tax" && g.contract === "jeonse"
         ? warnings.tax
         : step.id === "clauses" && item.id === "registration" && g.house === "officetel"
           ? warnings.registration
           : step.id === "clauses" && item.id === "insurance" ? warnings.insurance : undefined;
-      const checked = selected.includes(item.id);
       const warning = !checked && step.kind !== "registry" && (step.id !== "signing" || !!special);
       return {
         id: step.id + ":" + item.id, stepId: step.id, stage: step.stage,
@@ -1848,6 +1854,17 @@ export function getCheckpoints(g: GameState): Checkpoint[] {
         countRisk: warning,
         category: step.id === "inspection" ? "inspection" : step.id === "clauses" ? "clause" : "check",
       };
+    };
+    const notes: Checkpoint[] = (step.items ?? []).flatMap((item) => {
+      const checked = selected.includes(item.id);
+      const current = itemCheckpoint(item, checked);
+      if (!checked || !g.attempts[step.id]?.includes(item.id)) return [current];
+      return [{
+        ...itemCheckpoint(item, false),
+        id: `${step.id}:attempt:${item.id}`,
+        choice: "처음에는 확인하지 않았다 · " + item.title,
+        showFeedback: false,
+      }, current];
     });
     const addNotice = (id: string, feedback: Feedback, warning = false, showFeedback = true) => {
       notes.push({
@@ -1891,6 +1908,9 @@ export function rewindGame(g: GameState, stepId: string): GameState {
       Object.entries(g.answers).filter(([id]) => before.has(id)),
     ),
     drafts: { [stepId]: g.answers[stepId] ?? g.drafts[stepId] ?? [] },
+    attempts: Object.fromEntries(
+      Object.entries(g.attempts).filter(([id]) => before.has(id)),
+    ),
   };
 }
 
