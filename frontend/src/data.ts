@@ -1239,7 +1239,7 @@ export function getSteps(g: GameState): Step[] {
               priceLabel(home, g.contract) +
               ". 사진 속 방은 깨끗하다.",
             undefined,
-            "listing",
+            "app",
           ),
           beat("매물에 문의하자 답장이 온다.", undefined, "listing"),
           beat(

@@ -316,6 +316,10 @@ export default function App() {
   const homeProps = {
     started: game.page !== "home",
     onStartNew: () => (game.page !== "home" ? setModal("new") : restart()),
+    onChooseConditions: () =>
+      game.page === "play" || game.page === "ending"
+        ? setModal("conditions")
+        : restart("other"),
     onResume: () => setShowHome(false),
     onReplay: replay,
     onSameHome: () => restart("same"),
@@ -412,7 +416,7 @@ export default function App() {
       <AppModals
         modal={modal}
         onClose={() => setModal(null)}
-        onStartNew={() => restart()}
+        onStartNew={() => restart(modal === "conditions" ? "other" : "start")}
       />
     </div>
   );

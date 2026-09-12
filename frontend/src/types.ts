@@ -16,7 +16,7 @@ export type Page =
   | "house"
   | "play"
   | "ending";
-export type ModalKind = "new" | "appendix" | null;
+export type ModalKind = "new" | "conditions" | "appendix" | null;
 export type Background =
   | "home"
   | "app"

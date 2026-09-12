@@ -133,7 +133,8 @@ test("listing, deposit and contract speech are separate from narration", () => {
     listing.beats.map((beat) => beat.speaker),
     [undefined, undefined, "중개사 · 문자", undefined, "중개사"],
   );
-  assert.equal(listing.beats[0].background, "listing");
+  assert.equal(listing.beats[0].background, "app");
+  assert.equal(listing.beats[1].background, "listing");
   assert.equal(listing.beats[2].background, "message");
   const clauses = steps.find((step) => step.id === "clauses");
   assert.equal(clauses.beats[3].text, "넣으실 거 있으세요?");

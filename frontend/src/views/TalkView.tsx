@@ -80,11 +80,39 @@ export function TalkView({
     current.text,
     ...(lastLine ? (step.choices?.map((choice) => choice.label) ?? []) : []),
   ].join(" ");
+  const choices = lastLine && !answered && step.choices && (
+    <div className="scene-choice-panel" role="group" aria-label="선택지">
+      <div className="choices-container">
+        {step.choices.map((choice, index) => (
+          <button
+            key={choice.id}
+            className="choice-button"
+            disabled={!!choice.disabledReason}
+            onClick={() => onChoose(choice.id)}
+          >
+            <span className="choice-index">{index + 1}</span>
+            <span>
+              {choice.label}
+              {choice.disabledReason && <small>{choice.disabledReason}</small>}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+  const sceneContent = choices ? (
+    <>
+      {scene && <div className="choice-scene-reference">{scene}</div>}
+      {choices}
+    </>
+  ) : (
+    scene
+  );
   return (
     <SceneFrame
       background={current.background ?? step.background}
       context={context}
-      scene={lastLine || answered ? scene : undefined}
+      scene={lastLine || answered ? sceneContent : undefined}
       overlay={
         warning ? (
           <FeedbackPanel
@@ -111,28 +139,7 @@ export function TalkView({
             <NextButton onClick={onNext} />
           ) : null
         }
-      >
-        {lastLine && !answered && step.choices && (
-          <div className="choices-container">
-            {step.choices.map((choice, index) => (
-              <button
-                key={choice.id}
-                className="choice-button"
-                disabled={!!choice.disabledReason}
-                onClick={() => onChoose(choice.id)}
-              >
-                <span className="choice-index">{index + 1}</span>
-                <span>
-                  {choice.label}
-                  {choice.disabledReason && (
-                    <small>{choice.disabledReason}</small>
-                  )}
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-      </DialogueBox>
+      />
     </SceneFrame>
   );
 }

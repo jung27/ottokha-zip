@@ -1,4 +1,7 @@
-import { useState, type ReactNode } from "react";
+import { useState, useSyncExternalStore, type ReactNode } from "react";
+import housingAppImage from "../assets/housing-app.png";
+import listingInquiryImage from "../assets/listing-inquiry.png";
+import brokerMessageImage from "../assets/broker-message.png";
 import { dictionary } from "../data";
 import type { Background } from "../types";
 import { Icon } from "./Icon";
@@ -6,14 +9,27 @@ import { ScenePopup } from "./StoryModal";
 
 const backgrounds: Record<
   Background,
-  { description: string; specified: boolean }
+  { description: string; specified: boolean; src?: string }
 > = {
-  home: { description: "부동산 앱을 보고 있는 사진", specified: true },
-  app: { description: "부동산 앱을 보고 있는 사진", specified: true },
-  listing: { description: "매물 문의창이 떠 있는 사진", specified: true },
+  home: {
+    description: "부동산 앱을 보고 있는 사진",
+    specified: true,
+    src: housingAppImage,
+  },
+  app: {
+    description: "부동산 앱을 보고 있는 사진",
+    specified: true,
+    src: housingAppImage,
+  },
+  listing: {
+    description: "매물 문의창이 떠 있는 사진",
+    specified: true,
+    src: listingInquiryImage,
+  },
   message: {
     description: "화면에 메시지를 주고받은 텍스트의 사진",
     specified: true,
+    src: brokerMessageImage,
   },
   office: { description: "부동산 사진, 중개사 검은 실루엣", specified: true },
   agent: { description: "중개사 이미지", specified: true },
@@ -30,12 +46,22 @@ const backgrounds: Record<
   },
 };
 
+const compactSceneQuery = "(max-width: 1100px)";
+function subscribeToCompactScene(onChange: () => void) {
+  const query = window.matchMedia(compactSceneQuery);
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+}
+function isCompactScene() {
+  return window.matchMedia(compactSceneQuery).matches;
+}
+
 function Dictionary({
   context,
-  onClose,
+  autoFocus = false,
 }: {
   context: string;
-  onClose: () => void;
+  autoFocus?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState<string | null>(null);
@@ -62,15 +88,11 @@ function Dictionary({
       : dictionary;
   const selected = entries.find((entry) => entry.term === active) ?? entries[0];
   return (
-    <ScenePopup
-      title="용어 사전"
-      onClose={onClose}
-      className="dictionary-popup"
-    >
+    <>
       <label className="dictionary-search">
         <span className="sr-only">용어 검색</span>
         <input
-          autoFocus
+          autoFocus={autoFocus}
           type="search"
           placeholder="궁금한 단어를 찾아보세요"
           value={query}
@@ -106,7 +128,7 @@ function Dictionary({
       ) : (
         <p className="dictionary-empty">찾는 단어가 없습니다.</p>
       )}
-    </ScenePopup>
+    </>
   );
 }
 
@@ -126,8 +148,9 @@ export function SceneFrame({
   className?: string;
 }) {
   const [dictionaryOpen, setDictionaryOpen] = useState(false);
+  const compact = useSyncExternalStore(subscribeToCompactScene, isCompactScene);
   const photo = backgrounds[background];
-  const blocked = !!overlay || dictionaryOpen;
+  const blocked = !!overlay || (compact && dictionaryOpen);
   return (
     <section
       className={"adventure-scene " + className}
@@ -135,37 +158,68 @@ export function SceneFrame({
     >
       <div className={"scene-visual " + (scene ? "has-content" : "")}>
         <div className="scene-base" inert={blocked}>
-          <div
-            className="background-placeholder"
-            role="img"
-            aria-label={photo.description}
-          >
-            <Icon name="window" />
-            <span>{photo.specified ? "시나리오 이미지" : "이미지 제안"}</span>
-            <p>{photo.description}</p>
-          </div>
+          {photo.src ? (
+            <img
+              key={photo.src}
+              className="scene-image"
+              src={photo.src}
+              alt={photo.description}
+              decoding="async"
+              draggable={false}
+            />
+          ) : (
+            <div
+              className="background-placeholder"
+              role="img"
+              aria-label={photo.description}
+            >
+              <Icon name="window" />
+              <span>{photo.specified ? "시나리오 이미지" : "이미지 제안"}</span>
+              <p>{photo.description}</p>
+            </div>
+          )}
           <div className="scene-content">{scene}</div>
-          <button
-            className="dictionary-trigger"
-            onClick={() => setDictionaryOpen(true)}
-            aria-label="용어 사전 열기"
-            aria-expanded={dictionaryOpen}
-          >
-            <Icon name="book" />
-            <span>사전</span>
-          </button>
+          {compact && (
+            <button
+              className="dictionary-trigger"
+              onClick={() => setDictionaryOpen(true)}
+              aria-label="용어 사전 열기"
+              aria-expanded={dictionaryOpen}
+            >
+              <Icon name="book" />
+              <span>사전</span>
+            </button>
+          )}
         </div>
         {overlay}
-        {dictionaryOpen && !overlay && (
-          <Dictionary
-            context={context}
+        {compact && dictionaryOpen && !overlay && (
+          <ScenePopup
+            title="용어 사전"
             onClose={() => setDictionaryOpen(false)}
-          />
+            className="dictionary-popup"
+          >
+            <Dictionary context={context} autoFocus />
+          </ScenePopup>
         )}
       </div>
       <div className="dialogue-slot" inert={blocked}>
         {children}
       </div>
+      {!compact && (
+        <aside
+          className="dictionary-sidebar"
+          aria-label="용어 사전"
+          inert={!!overlay}
+        >
+          <div className="dictionary-heading">
+            <Icon name="book" />
+            <h2>용어 사전</h2>
+          </div>
+          <div className="dictionary-body">
+            <Dictionary context={context} />
+          </div>
+        </aside>
+      )}
     </section>
   );
 }
@@ -183,14 +237,11 @@ export function DialogueBox({
 }) {
   return (
     <div className="dialogue-box">
-      <div className="speaker-row">
-        {speaker && (
-          <span className="speaker-name">
-            <span className="speaker-dot" />
-            {speaker}
-          </span>
-        )}
-      </div>
+      {speaker && (
+        <div className="speaker-row">
+          <span className="speaker-name">{speaker}</span>
+        </div>
+      )}
       <div className="dialogue-body" key={text}>
         {text && (
           <p className="dialogue-text view-enter" aria-live="polite">

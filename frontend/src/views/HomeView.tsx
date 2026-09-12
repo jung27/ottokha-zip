@@ -31,6 +31,7 @@ function ReviewCards({ notes }: { notes: Checkpoint[] }) {
 export function HomeView({
   started,
   onStartNew,
+  onChooseConditions,
   onResume,
   onStartWithAI,
   ending,
@@ -42,6 +43,7 @@ export function HomeView({
 }: {
   started: boolean;
   onStartNew: () => void;
+  onChooseConditions: () => void;
   onResume: () => void;
   onStartWithAI: (input: string, signal: AbortSignal) => Promise<void>;
   ending?: Ending;
@@ -203,7 +205,7 @@ export function HomeView({
         <div className="home-direct">
           <button
             className="secondary-button"
-            onClick={onStartNew}
+            onClick={onChooseConditions}
             disabled={loading}
           >
             조건 직접 선택하기

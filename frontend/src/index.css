@@ -15,6 +15,7 @@
   --soft: #f5f8f6;
   --line: #dfe8e2;
   --accent: #3c8060;
+  --accent-ink: #ffffff;
   --mint: #c5e5cf;
   --accent-soft: #edf6ef;
   --selected: #e7f3ea;
@@ -35,6 +36,7 @@
   --soft: #141e25;
   --line: #2c3e43;
   --accent: #add9b9;
+  --accent-ink: #183126;
   --mint: #add9b9;
   --accent-soft: #1d302b;
   --selected: #203b31;
@@ -385,14 +387,26 @@ h3 {
 }
 
 /* 장면과 대화창은 모든 플레이 장면에서 같은 크기를 갖는다. */
+.app-main:has(.adventure-scene) {
+  width: min(1344px, 100%);
+}
 .adventure-scene {
+  /* 1920 × 1080 원본 기준. 낮은 화면에서는 대화창 공간을 남기며 함께 축소한다. */
+  --scene-width: clamp(720px, calc((100svh - 306px) * 16 / 9), 1024px);
+  width: min(100%, calc(var(--scene-width) + 264px));
+  margin-inline: auto;
   display: grid;
-  grid-template-rows: minmax(0, 1fr) 276px;
-  gap: 14px;
-  height: clamp(560px, calc(100svh - 126px), 820px);
+  grid-template-columns: minmax(0, 1fr) 248px;
+  grid-template-rows: auto 176px;
+  gap: 14px 16px;
 }
 .scene-visual {
+  grid-column: 1;
+  grid-row: 1;
   position: relative;
+  width: 100%;
+  min-width: 0;
+  aspect-ratio: 16 / 9;
   min-height: 0;
   overflow: hidden;
   border: 1px solid var(--line);
@@ -402,6 +416,15 @@ h3 {
 .scene-base {
   position: absolute;
   inset: 0;
+}
+.scene-image {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
 }
 .background-placeholder {
   position: absolute;
@@ -455,7 +478,6 @@ h3 {
 }
 .has-content .background-placeholder > p {
   font-size: 0.64rem;
-  padding-right: 80px;
 }
 .dictionary-trigger {
   position: absolute;
@@ -482,6 +504,9 @@ h3 {
   border-color: var(--accent);
 }
 .dialogue-slot {
+  grid-column: 1;
+  grid-row: 2;
+  min-width: 0;
   min-height: 0;
 }
 .dialogue-box {
@@ -492,27 +517,16 @@ h3 {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 18px;
-  padding: 18px 26px 16px;
+  padding: 17px 24px 14px;
   box-shadow: var(--shadow);
   position: relative;
   overflow: hidden;
 }
-.dialogue-box::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 26px;
-  height: 3px;
-  width: 42px;
-  background: var(--mint);
-  border-radius: 0 0 3px 3px;
-}
 .speaker-row {
-  height: 27px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  margin-bottom: 7px;
+  margin-bottom: 6px;
 }
 .speaker-name {
   display: inline-flex;
@@ -521,12 +535,6 @@ h3 {
   color: var(--accent);
   font-size: 0.76rem;
   font-weight: 700;
-}
-.speaker-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
 }
 .dialogue-body {
   flex: 1;
@@ -552,6 +560,16 @@ h3 {
 }
 .dialogue-actions:empty {
   margin-top: 0;
+}
+.dialogue-box > .dialogue-actions {
+  margin-top: 8px;
+}
+.dialogue-box .primary-button {
+  min-height: 36px;
+  padding: 8px 14px;
+  font-size: 0.76rem;
+  background: var(--accent);
+  color: var(--accent-ink);
 }
 .choices-container {
   display: grid;
@@ -594,8 +612,63 @@ h3 {
   font-size: 0.68rem;
   margin-top: 3px;
 }
+.scene-content:has(> .scene-choice-panel) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  padding: 60px 24px 24px;
+  overflow: hidden;
+}
+.scene-choice-panel {
+  width: min(680px, 100%);
+  min-height: 0;
+  max-height: 100%;
+  flex-shrink: 1;
+  padding: 14px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  border: 1px solid color-mix(in srgb, var(--surface) 70%, var(--line));
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface) 68%, transparent);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 28px #152b2420;
+}
+.scene-choice-panel .choices-container {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  margin: 0;
+}
+.scene-choice-panel .choice-button {
+  align-items: center;
+  padding: 12px 14px;
+  font-size: 0.85rem;
+  line-height: 1.75;
+  background: color-mix(in srgb, var(--surface) 45%, transparent);
+}
+.scene-choice-panel .choice-button:hover:not(:disabled),
+.scene-choice-panel .choice-button:focus-visible {
+  background: color-mix(in srgb, var(--selected) 88%, transparent);
+  border-color: var(--accent);
+}
+.scene-choice-panel .choice-index {
+  flex-shrink: 0;
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+}
+.choice-scene-reference {
+  width: 100%;
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.choice-scene-reference + .scene-choice-panel {
+  max-height: 60%;
+  flex-shrink: 0;
+}
 
-/* 사전과 경고는 장면 위에 겹쳐 열려 레이아웃을 밀지 않는다. */
+/* 경고와 작은 화면의 사전은 장면 위에 겹쳐 열린다. */
 .scene-popup-layer {
   position: absolute;
   inset: 0;
@@ -765,6 +838,58 @@ h3 {
   font-size: 0.75rem;
   line-height: 1.85;
   color: var(--muted);
+}
+.dictionary-sidebar {
+  grid-column: 2;
+  grid-row: 1 / 3;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+}
+.dictionary-heading {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-shrink: 0;
+  padding: 20px 18px 16px;
+}
+.dictionary-heading > svg {
+  width: 18px;
+  height: 18px;
+  color: var(--accent);
+}
+.dictionary-heading h2 {
+  font-size: 0.88rem;
+}
+.dictionary-body {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 18px 20px;
+  scrollbar-width: thin;
+}
+.dictionary-sidebar .dictionary-terms {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  max-height: 220px;
+  gap: 5px;
+}
+.dictionary-sidebar .dictionary-terms button {
+  text-align: left;
+  padding: 8px 10px;
+  color: var(--text);
+  font-size: 0.73rem;
+}
+.dictionary-sidebar .dictionary-terms button[aria-pressed="true"] {
+  color: var(--accent);
+}
+.dictionary-sidebar .dictionary-definition p {
+  color: var(--text);
+  line-height: 1.9;
 }
 
 /* 선택 화면은 일반 카드 레이아웃을 사용한다. */
@@ -1274,6 +1399,15 @@ dialog[open] {
     transform: translateY(0);
   }
 }
+@media (max-width: 1100px) {
+  .adventure-scene {
+    width: min(100%, var(--scene-width));
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .has-content .background-placeholder > p {
+    padding-right: 80px;
+  }
+}
 @media (max-width: 800px) {
   .app-header {
     padding-inline: 20px;
@@ -1325,11 +1459,13 @@ dialog[open] {
     padding: 6px 12px 20px;
   }
   .adventure-scene {
-    height: clamp(480px, calc(100svh - 96px), 800px);
-    grid-template-rows: minmax(0, 1fr) 264px;
+    width: 100%;
+    grid-template-rows: auto 176px;
     gap: 10px;
   }
   .scene-visual {
+    /* 좁은 화면에서도 장면 안의 경고와 사전 내용을 읽을 공간을 확보한다. */
+    min-height: 240px;
     border-radius: 14px;
   }
   .background-placeholder {
@@ -1353,6 +1489,18 @@ dialog[open] {
   .scene-content {
     padding: 57px 12px 15px;
   }
+  .scene-content:has(> .scene-choice-panel) {
+    padding: 56px 10px 10px;
+    gap: 8px;
+  }
+  .scene-choice-panel {
+    padding: 9px;
+    border-radius: 12px;
+  }
+  .scene-choice-panel .choice-button {
+    padding: 10px;
+    font-size: 0.76rem;
+  }
   .has-content .background-placeholder {
     padding: 12px;
   }
@@ -1363,11 +1511,7 @@ dialog[open] {
     padding: 14px 17px 13px;
     border-radius: 14px;
   }
-  .dialogue-box::before {
-    left: 17px;
-  }
   .speaker-row {
-    height: 23px;
     margin-bottom: 6px;
   }
   .speaker-name {
