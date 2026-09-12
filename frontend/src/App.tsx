@@ -22,7 +22,7 @@ import { TalkView } from "./views/TalkView";
 import { OnboardingModal } from "./components/OnboardingModal";
 
 // 실제 서버 API 기본 주소 (필요에 따라 변경)
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost";
+const API_BASE_URL = import.meta.env.API_BASE_URL || "http://localhost";
 
 // 서버 응답 타입
 type ServerRecommendationResponse = {
