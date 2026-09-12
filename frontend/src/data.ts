@@ -14,6 +14,7 @@ import type {
   Stage,
   Step,
 } from "./types.ts";
+import { registryPoints, registryFinding } from "./registry.ts";
 
 // 기존 Home 구조를 유지하면서 추가 설명을 보관한다.
 type HomeWithDetails = Home & {
@@ -47,9 +48,9 @@ export const contractTutorials: Record<
     title: "전세 + 대출 계약의 핵심",
     subtitle: "목돈 보증금 마련과 안전한 반환 따져보기",
     tips: [
-      "‘전세보증금 ÷ 매매 시세 × 100’로 전세가율을 계산할 수 있고 이를 통해 깡통전세 위험성을 알 수 있다.",
-      "반환보증 가입이 안 된다면 계약을 서두르지 않고 거절 사유를 꼭 확인한다. 신청 시기나 서류 등도 가입에 영향을 준다.",
-      "전세 계약은 대출 이자를 감당할 수 있는지와 만기 시 보증금을 안전하게 돌려받을 수 있는지를 최우선으로 고려해야 한다.",
+      "‘전세보증금 ÷ 매매 시세 × 100’로 전세가율을 계산할 수 있고 이를 통해 위험성을 알 수 있다.",
+      "반환보증 가입이 안 된다면 계약을 서두르지 않고 거절 사유를 꼭 확인한다. 신청 시기나 서류 등도 가입에 영향을 줄 수 있다.",
+      "전세 계약은 대출로 인해 생기는 이자를 감당할 수 있는지와 계약이 끝나고 보증금을 안전하게 돌려받을 수 있는지의 여부를 중요하게 고려해야 한다.",
     ],
   },
 };
@@ -549,15 +550,15 @@ const extraInspections: Record<HouseId, CheckItem[]> = {
     check(
       "mailbox",
       "건물 밖 · 우편함",
-      "이름표가 붙은 칸 수와 방치된 우편물을 살핀다.",
-      "광고보다 많은 이름표와 오래된 우편물이 보인다.",
+      "이름표가 붙은 칸 수로 실제 세대 수를 센다.",
+      "방치된 우편물은 공실·관리 부실 신호",
       "실제 세대 수와 관리 상태를 모르고 입주했다.",
     ),
     check(
       "meter-box",
       "건물 밖 · 계량기함",
       "세대별 전기·수도 계량기가 따로 있는지 묻는다.",
-      "수도 계량기를 여러 세대가 함께 쓴다.",
+      "세대별 계량기가 없으면 관리비 분배 분쟁이 생긴다.",
       "관리비 배분 기준을 두고 이웃과 다툰다.",
     ),
     check(
@@ -573,7 +574,7 @@ const extraInspections: Record<HouseId, CheckItem[]> = {
       "ventilation",
       "창문 개폐",
       "창문을 직접 열어 환기 가능 범위를 확인한다.",
-      "통유리의 작은 틈만 열린다.",
+      "통유리로 환기가 불가능한 구조면 요리 냄새가 안 빠진다.",
       "요리 냄새가 방 안에 오래 남는다.",
     ),
     check(
@@ -587,7 +588,7 @@ const extraInspections: Record<HouseId, CheckItem[]> = {
       "shops",
       "1층 상가 간판",
       "식당·술집의 환기구와 영업시간을 살핀다.",
-      "늦게까지 영업하는 가게의 환기구가 아래에 있다.",
+      "식당·술집이 있으면 냄새와 소음이 올라온다.",
       "밤마다 소음과 음식 냄새가 올라온다.",
     ),
   ],
@@ -596,14 +597,14 @@ const extraInspections: Record<HouseId, CheckItem[]> = {
       "crack",
       "외벽 균열",
       "균열과 보수 흔적, 관리 책임자를 확인한다.",
-      "외벽에 균열이 있는데 보수 담당자가 불분명하다.",
+      "소규모 건물은 관리 주체가 없다. 외벽 균열의 보수 담당자를 확인한다.",
       "공용 부분 수리를 두고 책임을 미룬다.",
     ),
     check(
       "vacancy",
-      "밤에 불 켜진 창",
-      "시간대를 바꿔 방문해 공실과 실제 입주 상황을 묻는다.",
-      "신축인데 불 켜진 방이 적다. 사유를 확인할 필요가 있다.",
+      "밤에 불 켜진 창 세기",
+      "밤에 불 켜진 창을 세어본다.",
+      "신축인데 공실이 많으면 분양이 안 된 것. 위험 신호",
       "비어 있는 집이 많아 건물 관리가 불안정하다.",
     ),
     check(
@@ -619,28 +620,28 @@ const extraInspections: Record<HouseId, CheckItem[]> = {
       "roof-floor",
       "옥상 바닥",
       "우레탄 방수가 벗겨졌는지 확인한다.",
-      "바닥 방수층이 벗겨져 있다.",
+      "우레탄 방수가 벗겨지면 아래로 샌다.",
       "비가 오자 옥상 바닥에서 누수가 시작된다.",
     ),
     check(
       "insulation",
-      "천장 단열",
-      "단열 시공 여부와 여름·겨울 실내 환경을 묻는다.",
-      "단열 시공 기록이 없다.",
+      "천장 단열재",
+      "천장에 단열재가 있는지 확인한다.",
+      "없으면 여름 실내가 40도까지 오른다.",
       "한여름 방 안이 뜨거워 냉방비가 늘어난다.",
     ),
     check(
       "stair",
       "외부 계단",
       "난간, 조명과 미끄럼 방지를 확인한다.",
-      "계단이 어둡고 난간이 흔들린다.",
+      "난간과 조명을 확인한다. 겨울에 얼면 위험하다.",
       "겨울에 얼어붙은 계단으로 출근해야 한다.",
     ),
     check(
       "roof-window",
       "옥상 쪽 창문",
       "옥상에서 창문에 쉽게 접근할 수 있는지 본다.",
-      "밖에서 손이 닿는 높이에 창문이 있다.",
+      "옥상에서 손이 닿는 구조면 방범창 필수",
       "창문을 열고 자기가 불안하다.",
     ),
   ],
@@ -649,14 +650,14 @@ const extraInspections: Record<HouseId, CheckItem[]> = {
       "flood-line",
       "벽 하단 수평 얼룩선",
       "벽 아래를 따라 같은 높이의 얼룩이 있는지 본다.",
-      "벽 하단에 수평 얼룩이 있다. 침수 흔적인지 물어봐야겠다.",
+      "물이 찼던 높이다. 가장 중요한 단서",
       "큰비가 내리자 과거 침수 흔적이 다시 떠오른다.",
     ),
     check(
       "high-socket",
       "콘센트 높이",
       "콘센트가 높은 곳에 설치된 이유를 묻는다.",
-      "콘센트가 비정상적으로 높다.",
+      "비정상적으로 높으면 침수 대비 흔적",
       "침수에 대비한 설비였다는 사실을 나중에 알았다.",
     ),
     check(
@@ -670,7 +671,7 @@ const extraInspections: Record<HouseId, CheckItem[]> = {
       "low-window",
       "창문 높이",
       "보행자 눈높이와 환기·방범 상태를 확인한다.",
-      "길을 걷는 사람과 눈이 마주친다.",
+      "보행자 눈높이면 종일 블라인드를 쳐야 한다.",
       "사생활 때문에 종일 블라인드를 내린다.",
     ),
   ],
@@ -700,7 +701,7 @@ const extraInspections: Record<HouseId, CheckItem[]> = {
       "room-window",
       "개인실 창문",
       "외기에 면한 창문과 피난·환기 시설을 확인한다.",
-      "방에 외부로 열린 창문이 없다.",
+      "창문 없는 방은 화재 시 매우 위험",
       "환기와 화재 시 대피 경로가 걱정된다.",
     ),
   ],
@@ -1143,6 +1144,13 @@ const good = (id: string, label: string, advice: string): Choice => ({
     advice,
   },
 });
+const result = (id: string, label: string, title: string, text: string): Choice => ({
+  id,
+  label,
+  status: "checked",
+  resultCard: true,
+  feedback: { title, text, advice: "" },
+});
 const bad = (
   id: string,
   label: string,
@@ -1196,13 +1204,6 @@ export const makeNewGame = (): GameState => ({
 
 export function clauseItems(contract: Contract): CheckItem[] {
   return [
-    check(
-      "rights",
-      "잔금일까지 근저당 등 새로운 권리를 설정하지 않는다. 위반 시 계약 해제 및 배액 반환",
-      "계약일부터 잔금일 다음 날 대항력 발생 시까지 근저당 등 새 권리를 설정하지 않는다. 위반 시 계약 해제와 지급금 반환·배액배상 범위를 합의한다.",
-      "등기부가 달라졌을 때 약정 위반을 주장할 근거를 보관했다.",
-      "잔금일 권리 변동에 대응할 특약을 남기지 않았다.",
-    ),
     check(
       "defects",
       "입주 전 발견된 하자는 임대인 부담으로 수리한다",
@@ -1379,10 +1380,11 @@ export function getSteps(g: GameState): Step[] {
             "message",
           ),
           beat(
-            "방문 약속을 잡고 부동산에 도착했다. 그런데 안내자가 다른 방 사진을 보여준다.",
+            "방문 약속을 잡고 부동산에 도착했다.",
             undefined,
             "office",
           ),
+          beat("그런데 안내자가 다른 방 사진을 보여준다.", undefined, "agent"),
           beat(
             "보셨던 방은 방금 나갔어요. 대신 비슷한 방이 하나 있어요. 오신 김에 보고 가시죠.",
             "중개사",
@@ -1507,9 +1509,10 @@ export function getSteps(g: GameState): Step[] {
           [
             bad("family", "가족이라니 그럴 수 있다고 넘어간다", "proxy"),
             bad("agent", "중개사가 보증한다고 하니 그대로 보낸다", "proxy"),
-            good(
+            result(
               "authority",
               "위임장과 인감증명서를 확인하고, 소유자 명의 계좌로만 보낸다",
+              "대리권 확인 완료",
               "위임 범위에 계약 체결과 금전 수령이 모두 들어 있는지 확인했다. 계약만 위임하고 수령은 위임하지 않은 경우가 있다.\n인감증명서 발급일이 최근인지 확인했다. 오래된 것은 이미 철회됐을 수 있다.\n송금은 소유자 명의 계좌로 한다. 대리인 계좌로 보내면 소유자에게 돈이 갔다는 증명이 어려워진다.",
             ),
             bad("promise", "아들 명의 계좌로 보내되 각서를 받아둔다", "proxy"),
@@ -1589,14 +1592,11 @@ export function getSteps(g: GameState): Step[] {
       ],
       items: clauseItems(g.contract),
       document: "lease",
-      notice:
-        g.answers.clauses?.length === 0
-          ? warnings.oral
-          : {
-              title: "특약사항",
-              text: '중개사가 "보통 안 넣는다"고 해도 요구하면 대부분 수용된다. 거절당한다면 그 자체가 정보다.',
-              advice: "",
-            },
+      notice: {
+        title: "특약사항",
+        text: '중개사가 "보통 안 넣는다"고 해도 요구하면 대부분 수용된다. 거절당한다면 그 자체가 정보다.',
+        advice: "",
+      },
     },
     {
       id: "signing",
@@ -1678,6 +1678,20 @@ export function getSteps(g: GameState): Step[] {
       explanation: warnings.timing,
     },
     {
+      id: "registry-game",
+      stage: 5,
+      kind: "registry",
+      eyebrow: "등기부 읽기",
+      title: "등기부에서 달라진 곳 찾기",
+      beats: [
+        beat("잔금일에 다시 발급한 등기부다. 갑구와 을구에서 이상한 곳을 찾아 눌러보자."),
+      ],
+      background: "lease",
+      items: registryPoints,
+      requiredItems: ["mortgage-date"],
+      explanation: registryFinding,
+    },
+    {
       ...choiceStep(
         "settlement",
         5,
@@ -1734,7 +1748,7 @@ export function getSteps(g: GameState): Step[] {
                 "guarantee",
               ),
             ],
-            "insurance",
+            "moving",
           ),
           explanation: warnings.guarantee,
         }
@@ -1751,9 +1765,12 @@ export function getSteps(g: GameState): Step[] {
             ],
             [
               bad("later", "일단 지내보고 나중에 말한다", "defect"),
-              good(
+              result(
                 "record",
                 "오늘 날짜가 남게 사진을 찍고 문자로 통보한 뒤 수리를 요구한다",
+                has(g, "clauses", "repair")
+                  ? "하자 수리 해결"
+                  : "시설물 수리 특약이 없다면",
                 has(g, "clauses", "repair")
                   ? "계약서의 시설물 수리 특약과 사진을 제시했다. 수리 일정과 비용 부담을 서면으로 확인했다."
                   : "그때 시설물 수리 특약을 넣었다면. 지금은 하자 사진과 문자로 발견 시점을 남기고, 수리 책임과 비용을 협의한다.",
@@ -1783,86 +1800,73 @@ export function getSteps(g: GameState): Step[] {
   );
   return steps;
 }
+export function isRiskCheckpoint(note: Checkpoint): boolean {
+  return note.status === "risk" && note.countRisk !== false;
+}
+
 export function getCheckpoints(g: GameState): Checkpoint[] {
   return getSteps(g).flatMap<Checkpoint>((step) => {
     const selected = g.answers[step.id];
     if (!selected) return [];
     if (step.choices) {
       const choice = step.choices.find((c) => selected.includes(c.id));
-      return choice
-        ? [
-            {
-              id: step.id,
-              stepId: step.id,
-              stage: step.stage,
-              status: choice.status,
-              title:
-                choice.status === "risk" ? choice.feedback.title : step.title,
-              choice: choice.label,
-              consequence:
-                choice.status === "checked"
-                  ? (step.explanation?.text ?? choice.feedback.text)
-                  : choice.feedback.text,
-              advice: step.explanation?.advice || choice.feedback.advice,
-              category: "decision" as const,
-            },
-          ]
-        : [];
+      if (!choice) return [];
+      return [{
+        id: step.id, stepId: step.id, stage: step.stage, status: choice.status,
+        title: choice.status === "risk" || choice.resultCard ? choice.feedback.title : step.title,
+        choice: choice.label,
+        consequence: choice.status === "checked" && !choice.resultCard
+          ? (step.explanation?.text ?? choice.feedback.text) : choice.feedback.text,
+        advice: choice.resultCard ? choice.feedback.advice : (step.explanation?.advice || choice.feedback.advice),
+        explanation: choice.resultCard ? step.explanation : undefined,
+        showFeedback: choice.status === "risk" || choice.resultCard === true,
+        category: "decision",
+      }];
     }
-    if (step.kind === "info")
-      return [
-        {
-          id: step.id,
-          stepId: step.id,
-          stage: step.stage,
-          status: "checked",
-          title: step.title,
-          choice: "서류를 확인했다",
-          consequence: step.beats.map((beat) => beat.text).join("\n"),
-          advice: "",
-          category: "check",
-        },
-      ];
-    return (step.items ?? []).map((item) => {
-      const special =
-        step.id === "signing" && item.id === "tax" && g.contract === "jeonse"
-          ? warnings.tax
-          : step.id === "clauses" &&
-              item.id === "registration" &&
-              g.house === "officetel"
-            ? warnings.registration
-            : step.id === "clauses" && item.id === "insurance"
-              ? warnings.insurance
-              : undefined;
+    if (step.kind === "info") return [{
+      id: step.id, stepId: step.id, stage: step.stage, status: "checked",
+      title: step.title, choice: "서류를 확인했다",
+      consequence: step.beats.map((beat) => beat.text).join("\n"),
+      advice: "", category: "check",
+    }];
+    const notes: Checkpoint[] = (step.items ?? []).map((item) => {
+      const special = step.id === "signing" && item.id === "tax" && g.contract === "jeonse"
+        ? warnings.tax
+        : step.id === "clauses" && item.id === "registration" && g.house === "officetel"
+          ? warnings.registration
+          : step.id === "clauses" && item.id === "insurance" ? warnings.insurance : undefined;
+      const checked = selected.includes(item.id);
+      const warning = !checked && step.kind !== "registry" && (step.id !== "signing" || !!special);
       return {
-        id: step.id + ":" + item.id,
-        stepId: step.id,
-        stage: step.stage,
-        status: selected.includes(item.id)
-          ? ("checked" as const)
-          : ("risk" as const),
-        title:
-          !selected.includes(item.id) && special ? special.title : item.title,
-        choice: selected.includes(item.id)
-          ? "확인했다 · " + item.title
-          : "확인하지 않고 넘어갔다 · " + item.title,
-        consequence: selected.includes(item.id)
-          ? item.signal
-          : (special?.text ?? item.consequence),
+        id: step.id + ":" + item.id, stepId: step.id, stage: step.stage,
+        status: checked ? "checked" : "risk",
+        title: !checked && special ? special.title : item.title,
+        choice: (checked ? "확인했다 · " : "확인하지 않고 넘어갔다 · ") + item.title,
+        consequence: checked ? item.signal : (special?.text ?? item.consequence),
         advice: special?.advice ?? item.advice,
-        category:
-          step.id === "inspection"
-            ? ("inspection" as const)
-            : step.id === "clauses"
-              ? ("clause" as const)
-              : ("check" as const),
+        showFeedback: warning,
+        countRisk: warning,
+        category: step.id === "inspection" ? "inspection" : step.id === "clauses" ? "clause" : "check",
       };
     });
+    const addNotice = (id: string, feedback: Feedback, warning = false, showFeedback = true) => {
+      notes.push({
+        id: step.id + ":" + id, stepId: step.id, stage: step.stage,
+        status: warning ? "risk" : "checked", title: feedback.title,
+        choice: id === "oral" ? "아무것도 넣지 않는다" : "이 장면에서 확인한 안내",
+        consequence: feedback.text, advice: feedback.advice,
+        category: "notice", showFeedback, countRisk: false,
+      });
+    };
+    if (step.id === "clauses" && selected.length === 0) addNotice("oral", warnings.oral, true);
+    if (step.notice) addNotice("notice", step.notice);
+    if (step.kind === "registry") addNotice("finding", registryFinding, false, false);
+    return notes;
   });
 }
 
 export function getEnding(g: GameState): Ending {
-  const risks = getCheckpoints(g).filter((note) => note.status === "risk");
+  const risks = getCheckpoints(g).filter(isRiskCheckpoint);
   return {
     id: "complete",
     symbol: "key",
@@ -1892,79 +1896,9 @@ export function rewindGame(g: GameState, stepId: string): GameState {
 
 export function hasRequiredItems(step: Step, selected: string[]): boolean {
   return (
-    !step.requireAll ||
-    Boolean(step.items?.every((item) => selected.includes(item.id)))
+    (step.requiredItems ?? []).every((id) => selected.includes(id)) &&
+    (!step.requireAll || Boolean(step.items?.every((item) => selected.includes(item.id))))
   );
-}
-
-export function restoreGame(raw: string | null): GameState {
-  const fresh = makeNewGame();
-  try {
-    const saved = JSON.parse(raw ?? "null");
-    if (
-      !saved ||
-      saved.version !== 3 ||
-      !["monthly", "jeonse"].includes(saved.contract) ||
-      !homes.some((h) => h.id === saved.house)
-    )
-      return fresh;
-    if (saved.contract === "jeonse" && saved.house === "goshiwon") return fresh;
-    const isRecord = (v: unknown): v is Record<string, string[]> =>
-      !!v &&
-      typeof v === "object" &&
-      !Array.isArray(v) &&
-      Object.values(v).every(
-        (a) => Array.isArray(a) && a.every((s) => typeof s === "string"),
-      );
-    if (!isRecord(saved.answers) || !isRecord(saved.drafts)) return fresh;
-    const game: GameState = {
-      ...fresh,
-      ...saved,
-      prologue: Number.isInteger(saved.prologue)
-        ? Math.max(0, Math.min(2, saved.prologue))
-        : 0,
-    };
-    if (
-      ![
-        "home",
-        "prologue",
-        "contract",
-        "tutorial",
-        "house",
-        "play",
-        "ending",
-      ].includes(game.page)
-    )
-      return fresh;
-    const steps = getSteps(game);
-    if (!steps.some((s) => s.id === game.cursor)) game.cursor = steps[0].id;
-    const inspection = steps.find((step) => step.id === "inspection")!;
-    // 예전의 5곳 제한으로 완료한 기록은 선택을 보존해 나머지를 확인하게 한다.
-    if (
-      game.answers.inspection &&
-      !hasRequiredItems(inspection, game.answers.inspection)
-    ) {
-      return {
-        ...game,
-        page: "play",
-        cursor: inspection.id,
-        answers: Object.fromEntries(
-          Object.entries(game.answers).filter(([id]) => id !== inspection.id),
-        ),
-        drafts: { ...game.drafts, inspection: game.answers.inspection },
-      };
-    }
-    if (
-      game.page === "ending" &&
-      !movingItems.every((item) => game.answers.moving?.includes(item.id))
-    ) {
-      game.page = "play";
-      game.cursor = "moving";
-    }
-    return game;
-  } catch {
-    return fresh;
-  }
 }
 
 // main의 AI 추천 응답을 현재 시나리오의 문자열 ID로 연결한다.

@@ -119,9 +119,7 @@ export function DocumentView(
         scene={<Paper step={step} home={home} contract={contract} />}
       />
     );
-  const showFeedback =
-    answered &&
-    (feedback.some((item) => item.status === "risk") || !!step.notice);
+  const showFeedback = answered && feedback.some((item) => item.showFeedback);
   const allChecked =
     step.items?.every((item) => selected.includes(item.id)) ?? true;
   const context =
@@ -141,7 +139,6 @@ export function DocumentView(
         showFeedback ? (
           <FeedbackPanel
             feedback={feedback}
-            notice={step.notice}
             onNext={onNext}
             onRetry={onRetry}
           />

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "../components/Icon";
+import { isRiskCheckpoint } from "../data";
 import { STAGES, type Checkpoint, type Ending, type Stage } from "../types";
 
 const API_BASE_URL = (
@@ -29,7 +30,7 @@ function ReviewCards({ notes }: { notes: Checkpoint[] }) {
               className={`rounded-md bg-accent-soft px-2 py-[5px] text-[0.65rem] font-semibold whitespace-nowrap text-accent
               group-data-[status=risk]/review:bg-risk-bg group-data-[status=risk]/review:text-risk`}
             >
-              {note.status === "risk" ? "다시 확인" : "확인함"}
+              {note.category === "notice" ? "안내" : note.status === "risk" ? "다시 확인" : "확인함"}
             </span>
             <p>{note.choice}</p>
           </div>
@@ -38,6 +39,13 @@ function ReviewCards({ notes }: { notes: Checkpoint[] }) {
           {note.advice && (
             <div className="mt-[15px] rounded-[9px] bg-soft px-[15px] py-3 text-xs leading-[1.85]">
               {note.advice}
+            </div>
+          )}
+          {note.explanation && (
+            <div className="mt-4 rounded-lg border border-line bg-soft p-4 text-xs leading-relaxed">
+              <h4 className="mb-2 font-semibold">{note.explanation.title}</h4>
+              <p className="whitespace-pre-line">{note.explanation.text}</p>
+              {note.explanation.advice && <p className="mt-2 whitespace-pre-line">{note.explanation.advice}</p>}
             </div>
           )}
         </article>
@@ -118,7 +126,7 @@ export function HomeView({
     setShowSummaryModal(true);
     if (summary) return; // 이미 요약된 내용이 있으면 재요청 생략
 
-    const riskNotes = notes.filter((n) => n.status === "risk");
+    const riskNotes = notes.filter(isRiskCheckpoint);
     if (riskNotes.length === 0) {
       setSummary(
         "이번 계약 과정에서 발생한 위험 선택이나 주의 항목이 없습니다! 안전하게 잘 진행하셨습니다.",
@@ -167,9 +175,7 @@ export function HomeView({
 
   if (ending) {
     const stageNotes = notes.filter((note) => note.stage === stage);
-    const totalRiskCount = notes.filter(
-      (note) => note.status === "risk",
-    ).length;
+    const totalRiskCount = notes.filter(isRiskCheckpoint).length;
 
     return (
       <div className="mx-auto max-w-[1020px] py-8 max-[600px]:px-1 max-[600px]:py-[25px]">
@@ -225,7 +231,7 @@ export function HomeView({
                 위험{" "}
                 {
                   notes.filter(
-                    (note) => note.stage === item.id && note.status === "risk",
+                    (note) => note.stage === item.id && isRiskCheckpoint(note),
                   ).length
                 }
               </small>

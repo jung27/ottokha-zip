@@ -10,12 +10,10 @@ import {
   getSteps,
   hasRequiredItems,
   makeNewGame,
-  restoreGame,
   rewindGame,
   selectedHome,
 } from "./data";
 import {
-  STORAGE_KEY,
   type GameState,
   type ModalKind,
   type PlayViewProps,
@@ -25,37 +23,20 @@ import { DocumentView } from "./views/DocumentView";
 import { ExploreView } from "./views/ExploreView";
 import { HomeView } from "./views/HomeView";
 import { TalkView } from "./views/TalkView";
+import { RegistryView } from "./views/RegistryView";
+import { EndingScene } from "./views/EndingScene";
 
-const THEME_KEY = "eotteokhajip-theme";
-const INTRO_KEY = "eotteokhajip-onboarding-seen";
 const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL || "http://localhost"
 ).replace(/\/$/, "");
 
 export default function App() {
-  const [game, setGame] = useState<GameState>(() => {
-    try {
-      return restoreGame(localStorage.getItem(STORAGE_KEY));
-    } catch {
-      return makeNewGame();
-    }
-  });
+  const [game, setGame] = useState<GameState>(makeNewGame);
+  const [reviewOpen, setReviewOpen] = useState(false);
   const [showHome, setShowHome] = useState(false);
   const [replayVersion, setReplayVersion] = useState(0);
-  const [theme, setTheme] = useState<"light" | "dark">(() => {
-    try {
-      return localStorage.getItem(THEME_KEY) === "dark" ? "dark" : "light";
-    } catch {
-      return "light";
-    }
-  });
-  const [showOnboarding, setShowOnboarding] = useState(() => {
-    try {
-      return localStorage.getItem(INTRO_KEY) !== "true";
-    } catch {
-      return false;
-    }
-  });
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [showOnboarding, setShowOnboarding] = useState(true);
   const [recommendation, setRecommendation] = useState("");
   const [isAiFlow, setIsAiFlow] = useState(false);
 
@@ -72,19 +53,9 @@ export default function App() {
     document
       .querySelector('meta[name="theme-color"]')
       ?.setAttribute("content", theme === "light" ? "#ffffff" : "#11191f");
-    try {
-      localStorage.setItem(THEME_KEY, theme);
-    } catch {
-      /* 화면 전환은 저장 없이도 동작한다. */
-    }
   }, [theme]);
 
   function finishOnboarding() {
-    try {
-      localStorage.setItem(INTRO_KEY, "true");
-    } catch {
-      /* 저장을 허용하지 않는 브라우저 */
-    }
     setShowOnboarding(false);
   }
 
@@ -133,7 +104,6 @@ export default function App() {
   }
 
   const [modal, setModal] = useState<ModalKind>(null);
-  const [storageFailed, setStorageFailed] = useState(false);
   const appRef = useRef<HTMLElement>(null);
   const home = selectedHome(game);
   const steps = getSteps(game);
@@ -150,17 +120,13 @@ export default function App() {
   const ending = game.page === "ending" && !showHome;
 
   useEffect(() => {
-    // 체크박스를 연속으로 누를 때 저장을 합치고, 실패도 화면에 알린다.
-    const timer = window.setTimeout(() => {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(game));
-        setStorageFailed(false);
-      } catch {
-        setStorageFailed(true);
-      }
-    }, 100);
-    return () => window.clearTimeout(timer);
-  }, [game]);
+    // 브라우저의 뒤로 가기 캐시로 다시 방문해도 새 게임으로 시작한다.
+    const startFresh = (event: PageTransitionEvent) => {
+      if (event.persisted) window.location.reload();
+    };
+    window.addEventListener("pageshow", startFresh);
+    return () => window.removeEventListener("pageshow", startFresh);
+  }, []);
 
   useEffect(() => {
     const label = isHome
@@ -212,6 +178,7 @@ export default function App() {
   }, [modal, showOnboarding]);
 
   function restart(mode: "start" | "same" | "other" = "start") {
+    setReviewOpen(false);
     setModal(null);
     setShowHome(false);
     setRecommendation("");
@@ -226,6 +193,7 @@ export default function App() {
   }
 
   function replay(stepId: string) {
+    setReviewOpen(false);
     setGame((previous) => rewindGame(previous, stepId));
     setReplayVersion((version) => version + 1);
     setShowHome(false);
@@ -354,21 +322,14 @@ export default function App() {
         className={`mx-auto w-[min(1184px,100%)] px-7 pt-2.5 pb-[30px] outline-none has-[[data-scene]]:w-[min(1344px,100%)]
         max-[800px]:px-5 max-[600px]:px-3 max-[600px]:pt-1.5 max-[600px]:pb-5`}
       >
-        {storageFailed && (
-          <div
-            className="mb-2.5 rounded-[10px] border border-risk-line bg-risk-bg px-[15px] py-2.5 text-xs text-risk"
-            role="status"
-          >
-            브라우저에 진행 기록을 저장할 수 없어요. 이 창에서는 계속 진행할 수
-            있지만 새로고침하면 기록이 사라질 수 있어요.
-          </div>
-        )}
         {isHome ? (
           <HomeView {...homeProps} />
         ) : ending ? (
-          <>
+          reviewOpen ? (
             <HomeView {...homeProps} ending={getEnding(game)} notes={notes} />
-          </>
+          ) : (
+            <EndingScene home={home} onReview={() => setReviewOpen(true)} />
+          )
         ) : game.page !== "play" ? (
           <ChooseView
             key={game.page + ":" + game.contract}
@@ -415,6 +376,8 @@ export default function App() {
               <div key={step.id + ":" + replayVersion}>
                 {step.kind === "inspection" ? (
                   <ExploreView {...playProps} />
+                ) : step.kind === "registry" ? (
+                  <RegistryView {...playProps} home={home} contract={game.contract} />
                 ) : step.kind === "checklist" ||
                   step.document === "registry" ||
                   step.document === "lease" ? (

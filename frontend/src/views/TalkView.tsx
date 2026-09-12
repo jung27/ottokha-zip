@@ -1,32 +1,29 @@
 import { useState, type ReactNode } from "react";
 import { DialogueBox, NextButton, SceneFrame } from "../components/Journal";
 import { ScenePopup } from "../components/StoryModal";
-import type { Checkpoint, Feedback, PlayViewProps } from "../types";
+import type { Checkpoint, PlayViewProps } from "../types";
 
 export function FeedbackPanel({
   feedback,
-  notice,
   onNext,
   onRetry,
 }: {
   feedback: Checkpoint[];
-  notice?: Feedback;
   onNext: () => void;
   onRetry: () => void;
 }) {
   const [index, setIndex] = useState(0);
   const cards = [
     ...feedback
-      .filter((item) => item.status === "risk")
+      .filter((item) => item.showFeedback)
       .map((item) => ({
         id: item.id,
         title: item.title,
         text: item.consequence,
         advice: item.advice,
         choice: item.choice,
-        risk: true,
+        risk: item.status === "risk",
       })),
-    ...(notice ? [{ id: "notice", ...notice, choice: "", risk: false }] : []),
   ];
   const current = cards[index];
   if (!current) return null;
@@ -88,7 +85,7 @@ export function TalkView({
   const current = step.beats[answered ? step.beats.length - 1 : line];
   const lastLine = line >= step.beats.length - 1;
   const chosen = step.choices?.find((choice) => selected.includes(choice.id));
-  const warning = answered && feedback.some((item) => item.status === "risk");
+  const warning = answered && feedback.some((item) => item.showFeedback);
   const context = [
     current.text,
     ...(lastLine ? (step.choices?.map((choice) => choice.label) ?? []) : []),

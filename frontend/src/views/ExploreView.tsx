@@ -83,7 +83,6 @@ export function ExploreView({
         answered ? (
           <FeedbackPanel
             feedback={feedback}
-            notice={step.notice}
             onNext={onNext}
             onRetry={onRetry}
           />

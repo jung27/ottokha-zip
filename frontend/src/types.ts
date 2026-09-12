@@ -69,6 +69,7 @@ export type Choice = {
   label: string;
   status: Status;
   feedback: Feedback;
+  resultCard?: boolean;
   consequence?: string;
   disabledReason?: string;
 };
@@ -84,7 +85,7 @@ export type CheckItem = {
 export type Step = {
   id: string;
   stage: Stage;
-  kind: "choice" | "inspection" | "checklist" | "info" | "recap";
+  kind: "choice" | "inspection" | "checklist" | "registry" | "info" | "recap";
   eyebrow: string;
   title: string;
   beats: StoryBeat[];
@@ -94,6 +95,7 @@ export type Step = {
   notice?: Feedback;
   explanation?: Feedback;
   requireAll?: boolean;
+  requiredItems?: string[];
   document?: "registry" | "lease" | "message";
 };
 export type Checkpoint = {
@@ -105,7 +107,10 @@ export type Checkpoint = {
   choice: string;
   consequence: string;
   advice: string;
-  category: "decision" | "inspection" | "clause" | "check";
+  category: "decision" | "inspection" | "clause" | "check" | "notice";
+  showFeedback?: boolean;
+  countRisk?: boolean;
+  explanation?: Feedback;
 };
 export type PlayViewProps = {
   step: Step;
@@ -165,7 +170,6 @@ export type IconName =
   | "external"
   | "reset";
 
-export const STORAGE_KEY = "eotteokhajip-story-v3";
 export const STAGES: {
   id: Stage;
   title: string;

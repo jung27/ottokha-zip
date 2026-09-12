@@ -11,11 +11,14 @@ import {
   movingItems,
   parseRecommendation,
   priceLabel,
-  restoreGame,
+  isRiskCheckpoint,
+  clauseItems,
+  tutorials,
   rewindGame,
   explorationScripts,
   contractScripts,
 } from "./src/data.ts";
+import { calculateMortgage, registryFinding, registryPoints } from "./src/registry.ts";
 
 function finish(contract, house, mode) {
   const game = { ...makeNewGame(), page: "play", contract, house };
@@ -49,7 +52,7 @@ function finish(contract, house, mode) {
     } else if (step.items) {
       game.answers[step.id] =
         mode === "risk" && !step.requireAll
-          ? []
+          ? (step.requiredItems ?? [])
           : step.items.map((item) => item.id);
       assert.equal(hasRequiredItems(step, game.answers[step.id]), true);
       const missing = step.items.filter(
@@ -57,7 +60,7 @@ function finish(contract, house, mode) {
       );
       assert.equal(
         getCheckpoints(game).filter(
-          (item) => item.stepId === step.id && item.status === "risk",
+          (item) => item.stepId === step.id && item.status === "risk" && item.category !== "notice",
         ).length,
         missing.length,
       );
@@ -72,7 +75,6 @@ function finish(contract, house, mode) {
       );
       assert.equal(getEnding(game).id, "complete");
       assert.equal(visited.at(-1).id, "moving");
-      assert.deepEqual(restoreGame(JSON.stringify(game)), game);
       return game;
     }
     game.cursor = next.id;
@@ -128,7 +130,7 @@ test("listing, deposit and contract speech are separate from narration", () => {
   const listing = steps.find((step) => step.id === "listing");
   assert.deepEqual(
     listing.beats.map((beat) => beat.speaker),
-    [undefined, undefined, "중개사 · 문자", undefined, "중개사"],
+    [undefined, undefined, "중개사 · 문자", undefined, undefined, "중개사"],
   );
   assert.equal(listing.beats[0].background, "app");
   assert.equal(listing.beats[1].background, "message");
@@ -141,19 +143,13 @@ test("current stage five order ends with a mandatory moving checklist", () => {
   const steps = getSteps(makeNewGame());
   assert.deepEqual(
     steps.filter((step) => step.stage === 5).map((step) => step.id),
-    ["account", "timing", "settlement", "defect", "moving"],
+    ["account", "timing", "registry-game", "settlement", "defect", "moving"],
   );
   for (const removed of ["cost", "loan", "recap", "renewal", "return"])
     assert.ok(!steps.some((step) => step.id === removed));
   assert.equal(steps.at(-1).requireAll, true);
   assert.equal(movingItems.length, 6);
-  const saved = {
-    ...makeNewGame(),
-    page: "ending",
-    answers: { moving: ["lock"] },
-  };
-  assert.equal(restoreGame(JSON.stringify(saved)).page, "play");
-  assert.equal(restoreGame(JSON.stringify(saved)).cursor, "moving");
+
 });
 test("all inspected and skipped items, including house-specific extras, remain in the review", () => {
   for (const home of homes) {
@@ -171,7 +167,7 @@ test("all inspected and skipped items, including house-specific extras, remain i
       .find((item) => item.stepId === "listing")
       .consequence.includes("좋은 조건의 매물로 방문을 유도"),
   );
-  const risks = notes.filter((item) => item.status === "risk").length;
+  const risks = notes.filter(isRiskCheckpoint).length;
   assert.equal(
     getEnding(game).text,
     "당신은 이번 계약에서 위험한 선택 " + risks + "번을 했습니다.",
@@ -198,35 +194,10 @@ test("inspection requires every common and house-specific point, including after
   }
 });
 
-test("old partial inspection saves reopen without losing selections or other scene history", () => {
-  for (const home of homes) {
-    const complete = finish("monthly", home.id, "checked");
-    const items = inspectionItems(home.id);
-    const common = items.filter((item) => !item.extra).map((item) => item.id);
-    const extras = items.filter((item) => item.extra).map((item) => item.id);
-    for (const selected of [[], common.slice(0, 5), [...common.slice(0, 5), ...extras], common]) {
-      for (const cursor of ["inspection", "deposit", "moving"]) {
-        const saved = { ...complete, cursor, page: cursor === "moving" ? "ending" : "play", answers: { ...complete.answers, inspection: selected } };
-        const restored = restoreGame(JSON.stringify(saved));
-        assert.equal(restored.page, "play");
-        assert.equal(restored.cursor, "inspection");
-        assert.deepEqual(restored.drafts.inspection, selected);
-        assert.deepEqual(restored.answers.listing, complete.answers.listing);
-        assert.deepEqual(restored.answers["house-search"], complete.answers["house-search"]);
-        assert.equal(restored.answers.inspection, undefined);
-        assert.deepEqual(restored.answers.deposit, complete.answers.deposit);
-        assert.deepEqual(restored.answers.moving, complete.answers.moving);
-        assert.deepEqual(restoreGame(JSON.stringify(restored)), restored);
-      }
-    }
-  }
-});
-
 test("fully checked routes no longer receive risks for forced inspection omissions", () => {
   for (const home of homes) {
     const game = finish("monthly", home.id, "checked");
     assert.equal(getCheckpoints(game).filter((item) => item.status === "risk").length, 0);
-    assert.deepEqual(restoreGame(JSON.stringify(game)), game);
   }
 });
 
@@ -244,25 +215,6 @@ test("replaying a stage retains earlier decisions and clears dependent branches"
     1,
   );
   assert.equal(getCheckpoints(rewindGame(game, "listing")).length, 0);
-});
-test("old or malformed saves cannot reinterpret changed scenario choices", () => {
-  for (const raw of [
-    "null",
-    "{",
-    "[]",
-    JSON.stringify({ ...makeNewGame(), version: 2 }),
-    JSON.stringify({ ...makeNewGame(), answers: [] }),
-    JSON.stringify({ ...makeNewGame(), contract: "jeonse", house: "goshiwon" }),
-  ]) {
-    assert.deepEqual(restoreGame(raw), makeNewGame());
-  }
-  const game = {
-    ...makeNewGame(),
-    page: "play",
-    cursor: "inspection",
-    drafts: { inspection: ["water", "mailbox"] },
-  };
-  assert.deepEqual(restoreGame(JSON.stringify(game)), game);
 });
 test("main AI responses map to scenario ids and reject incomplete or impossible combinations", () => {
   assert.deepEqual(parseRecommendation({ first: "월세", second: "원룸" }), {
@@ -285,4 +237,103 @@ test("main AI responses map to scenario ids and reject incomplete or impossible 
     { first: "전세", second: "고시원" },
   ])
     assert.throws(() => parseRecommendation(value));
+});
+
+test("registry game appears on every route and requires finding the new mortgage date", () => {
+  for (const home of homes) {
+    const step = getSteps({ ...makeNewGame(), house: home.id }).find((s) => s.id === "registry-game");
+    assert.equal(step.kind, "registry");
+    assert.deepEqual(step.items.map((p) => p.title), ["소유자 이름", "소유권 이전 날짜", "신탁 표기", "근저당권 설정 날짜", "채권최고액", "근저당권자"]);
+    assert.equal(hasRequiredItems(step, []), false);
+    assert.equal(hasRequiredItems(step, registryPoints.filter((p) => p.id !== "mortgage-date").map((p) => p.id)), false);
+    assert.equal(hasRequiredItems(step, ["mortgage-date"]), true);
+    assert.match(registryFinding.text, /계약을 해지/);
+  }
+});
+
+test("mortgage exercise calculates ratios and rejects incomplete or invalid input", () => {
+  assert.deepEqual(calculateMortgage(20000, 12000, 120, 8000), { estimatedLoan: 10000, claimRatio: 60, combinedRatio: 100 });
+  assert.equal(calculateMortgage(20000, 11000, 110, 0).estimatedLoan, 10000);
+  assert.equal(calculateMortgage(20000, 13000, 130, 0).estimatedLoan, 10000);
+  for (const args of [[0,12000,120,8000], [20000,-1,120,8000], [20000,12000,109,8000], [20000,12000,131,8000], [20000,12000,120,-1], [NaN,12000,120,8000], [Infinity,12000,120,8000]])
+    assert.equal(calculateMortgage(...args), null);
+});
+
+test("review retains common tips, oral warning and the actual safe result without duplicate risk counts", () => {
+  const game = { ...makeNewGame(), answers: { inspection: inspectionItems("oneroom").map((i) => i.id), deposit: ["owner"], proxy: ["authority"], clauses: [], defect: ["record"], "registry-game": ["mortgage-date"] } };
+  const notes = getCheckpoints(game);
+  assert.match(notes.find((n) => n.id === "inspection:notice").consequence, /시간대를 바꿔 두 번/);
+  assert.match(notes.find((n) => n.id === "clauses:notice").consequence, /거절당한다면/);
+  assert.match(notes.find((n) => n.id === "clauses:oral").consequence, /말은 계약서에 없으면/);
+  const proxy = notes.find((n) => n.id === "proxy");
+  assert.equal(proxy.title, "대리권 확인 완료");
+  assert.match(proxy.consequence, /계약 체결과 금전 수령/);
+  assert.match(proxy.consequence, /인감증명서 발급일/);
+  assert.match(proxy.consequence, /소유자 명의 계좌/);
+  assert.match(proxy.explanation.text, /가족 관계는 대리권과 별개/);
+  assert.equal(proxy.showFeedback, true);
+  assert.equal(notes.find((n) => n.id === "defect").title, "시설물 수리 특약이 없다면");
+  assert.ok(notes.some((n) => n.id === "registry-game:finding"));
+  assert.equal(notes.filter(isRiskCheckpoint).length, 3);
+  game.answers.clauses = ["repair"];
+  const resolved = getCheckpoints(game).find((n) => n.id === "defect");
+  assert.equal(resolved.title, "하자 수리 해결");
+  assert.match(resolved.consequence, /수리 일정과 비용 부담을 서면으로 확인/);
+  assert.match(resolved.explanation.title, /시점을 놓친 하자/);
+});
+
+test("signing shows only the jeonse tax warning while retaining all checks in review", () => {
+  for (const contract of ["monthly", "jeonse"]) {
+    for (let mask = 0; mask < 8; mask++) {
+      const selected = ["identity", "agent", "tax"].filter((_, index) => mask & (1 << index));
+      const notes = getCheckpoints({ ...makeNewGame(), contract, answers: { signing: selected } });
+      assert.equal(notes.length, 3);
+      const expected = contract === "jeonse" && !selected.includes("tax") ? 1 : 0;
+      assert.equal(notes.filter((n) => n.showFeedback).length, expected);
+      assert.equal(notes.filter(isRiskCheckpoint).length, expected);
+      if (expected) assert.match(notes.find((n) => n.showFeedback).title, /국세 체납/);
+    }
+  }
+});
+
+test("clauses and tutorial text match the supplied scenario", () => {
+  assert.deepEqual(clauseItems("monthly").map((i) => i.id), ["defects", "registration", "repair"]);
+  assert.deepEqual(clauseItems("jeonse").map((i) => i.id), ["defects", "registration", "repair", "insurance"]);
+  assert.equal(tutorials.jeonse[0], "‘전세보증금 ÷ 매매 시세 × 100’로 전세가율을 계산할 수 있고 이를 통해 위험성을 알 수 있다.");
+  assert.match(tutorials.jeonse[1], /영향을 줄 수 있다/);
+  assert.match(tutorials.jeonse[2], /중요하게 고려해야 한다/);
+});
+
+test("extra inspection explanations are available in the confirmed-item UI fields", () => {
+  for (const [house, id, required] of [
+    ["oneroom", "meter-box", /관리비 분배 분쟁/],
+    ["officetel", "ventilation", /요리 냄새/],
+    ["officetel", "shops", /냄새와 소음/],
+    ["villa", "vacancy", /분양이 안 된/],
+    ["rooftop", "insulation", /40도/],
+    ["rooftop", "roof-window", /방범창 필수/],
+    ["goshiwon", "room-window", /화재 시 매우 위험/],
+  ]) {
+    const item = inspectionItems(house).find((i) => i.id === id);
+    assert.match([item.description, item.signal, item.advice].join(" "), required);
+  }
+});
+
+test("insurance scene never shows an approval photo before an application", () => {
+  for (const home of homes.filter((h) => h.jeonse !== null)) {
+    const step = getSteps({ ...makeNewGame(), contract: "jeonse", house: home.id }).find((s) => s.id === "insurance");
+    assert.notEqual(step.background, "insurance");
+    assert.ok(step.beats.every((b) => b.background !== "insurance"));
+    assert.match(step.choices.find((c) => c.id === "apply").feedback.text, /신청했다/);
+  }
+});
+
+test("a new visit gets independent empty state even after a completed run", () => {
+  const completed = finish("jeonse", "villa", "checked");
+  const fresh = makeNewGame();
+  assert.equal(fresh.page, "home");
+  assert.equal(fresh.cursor, "listing");
+  assert.deepEqual(fresh.answers, {});
+  assert.deepEqual(fresh.drafts, {});
+  assert.notEqual(fresh.answers, completed.answers);
 });
