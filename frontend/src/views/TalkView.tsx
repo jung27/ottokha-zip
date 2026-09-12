@@ -1,80 +1,145 @@
-import { Icon } from "../components/Icon";
-import { Journal } from "../components/Journal";
-import { talkItems } from "../data";
-import type { Contract, Note } from "../types";
+import { useState, type ReactNode } from "react";
+import { DialogueBox, NextButton, SceneFrame } from "../components/Journal";
+import { ScenePopup } from "../components/StoryModal";
+import type { Checkpoint, Feedback, PlayViewProps } from "../types";
+
+export function FeedbackPanel({
+  feedback,
+  notice,
+  onNext,
+  onRetry,
+}: {
+  feedback: Checkpoint[];
+  notice?: Feedback;
+  onNext: () => void;
+  onRetry: () => void;
+}) {
+  const [index, setIndex] = useState(0);
+  const cards = [
+    ...feedback
+      .filter((item) => item.status === "risk")
+      .map((item) => ({
+        id: item.id,
+        title: item.title,
+        text: item.consequence,
+        advice: item.advice,
+        choice: item.choice,
+        risk: true,
+      })),
+    ...(notice ? [{ id: "notice", ...notice, choice: "", risk: false }] : []),
+  ];
+  const current = cards[index];
+  if (!current) return null;
+  const proceed = () =>
+    index < cards.length - 1 ? setIndex(index + 1) : onNext();
+  return (
+    <ScenePopup
+      key={current.id}
+      title={current.title}
+      alert={current.risk}
+      onClose={proceed}
+      actions={
+        <>
+          <button className="text-button" onClick={onRetry}>
+            다시 선택
+          </button>
+          <NextButton onClick={proceed} />
+        </>
+      }
+    >
+      {current.choice && (
+        <p className="warning-choice">내 선택 · {current.choice}</p>
+      )}
+      <p className="warning-text">{current.text}</p>
+      {current.advice && (
+        <div className="warning-advice">
+          <strong>이렇게 확인하세요</strong>
+          <p>{current.advice}</p>
+        </div>
+      )}
+    </ScenePopup>
+  );
+}
 
 export function TalkView({
-  contract,
-  notes,
-  talked,
-  dialogue,
-  onAskQuestion,
+  step,
+  selected,
+  answered,
+  feedback,
+  onChoose,
   onNext,
-  onOpenNotebook,
-}: {
-  contract: Contract;
-  notes: Note[];
-  talked: string[];
-  dialogue: number | null;
-  onAskQuestion: (idx: number) => void;
-  onNext: () => void;
-  onOpenNotebook: () => void;
-}) {
-  return (
-    <div className="space-y-6 pt-6">
-      <div className="border-b border-[#2c373e] pb-4">
-        <span className="text-xs text-[#add9b9]">
-          세 번째 장면 · 중개사와의 대화
-        </span>
-        <h1 className="text-2xl font-bold text-white mt-1">
-          좋은 질문 하나가, 단서가 된다.
-        </h1>
-      </div>
-
-      <div className="flex gap-6">
-        <div className="flex-1 space-y-4">
-          <div className="p-5 rounded-xl border border-[#38464e] bg-[#1a252d] space-y-2">
-            <div className="text-xs font-semibold text-[#add9b9]">
-              한서진 공인중개사
-            </div>
-            <p className="text-sm sm:text-base text-gray-200 pre-line">
-              {dialogue === null
-                ? "“방은 어떠셨어요? 궁금한 점이 있으면 편하게 물어보세요.”"
-                : talkItems[dialogue].reply(contract)}
-            </p>
-          </div>
-
-          <div className="space-y-2 choices-container">
-            {talkItems.map((item, idx) => (
-              <button
-                key={item.id}
-                onClick={() => onAskQuestion(idx)}
-                className={`btn w-full justify-between text-left text-sm ${
-                  talked.includes(item.id)
-                    ? "bg-[#1b2b29] border-[#36534a] text-[#add9b9]"
-                    : "bg-[#17232b] border-[#34434c] text-gray-300"
-                }`}
-              >
-                <span className="flex items-center gap-2">
-                  <kbd className="kbd kbd-sm bg-black/40">{idx + 1}</kbd>{" "}
-                  {item.label}
-                </span>
-                <Icon name={talked.includes(item.id) ? "check" : "chat"} />
-              </button>
-            ))}
-          </div>
-
-          {talked.includes("papers") && (
-            <button
-              className="btn w-full bg-[#add9b9] hover:bg-[#c5e9ce] text-[#15271d] font-bold border-none mt-4"
-              onClick={onNext}
-            >
-              건네받은 서류 살펴보기 <Icon name="arrow" />
-            </button>
-          )}
-        </div>
-        <Journal notes={notes} onOpenNotebook={onOpenNotebook} />
+  onRetry,
+  scene,
+}: PlayViewProps & { scene?: ReactNode }) {
+  const [line, setLine] = useState(0);
+  const current = step.beats[answered ? step.beats.length - 1 : line];
+  const lastLine = line >= step.beats.length - 1;
+  const chosen = step.choices?.find((choice) => selected.includes(choice.id));
+  const warning = answered && feedback.some((item) => item.status === "risk");
+  const context = [
+    current.text,
+    ...(lastLine ? (step.choices?.map((choice) => choice.label) ?? []) : []),
+  ].join(" ");
+  const choices = lastLine && !answered && step.choices && (
+    <div className="scene-choice-panel" role="group" aria-label="선택지">
+      <div className="choices-container">
+        {step.choices.map((choice, index) => (
+          <button
+            key={choice.id}
+            className="choice-button"
+            disabled={!!choice.disabledReason}
+            onClick={() => onChoose(choice.id)}
+          >
+            <span className="choice-index">{index + 1}</span>
+            <span>
+              {choice.label}
+              {choice.disabledReason && <small>{choice.disabledReason}</small>}
+            </span>
+          </button>
+        ))}
       </div>
     </div>
+  );
+  const sceneContent = choices ? (
+    <>
+      {scene && <div className="choice-scene-reference">{scene}</div>}
+      {choices}
+    </>
+  ) : (
+    scene
+  );
+  return (
+    <SceneFrame
+      background={current.background ?? step.background}
+      context={context}
+      scene={lastLine || answered ? sceneContent : undefined}
+      overlay={
+        warning ? (
+          <FeedbackPanel
+            feedback={feedback}
+            onNext={onNext}
+            onRetry={onRetry}
+          />
+        ) : undefined
+      }
+    >
+      <DialogueBox
+        speaker={answered && !warning ? undefined : current.speaker}
+        text={
+          answered && !warning
+            ? (chosen?.feedback.text ?? current.text)
+            : current.text
+        }
+        actions={
+          answered ? (
+            <NextButton onClick={onNext} disabled={warning} />
+          ) : !lastLine ? (
+            <NextButton onClick={() => setLine(line + 1)} />
+          ) : !step.choices ? (
+            <NextButton onClick={onNext} />
+          ) : null
+        }
+      />
+    </SceneFrame>
   );
 }

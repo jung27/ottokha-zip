@@ -1,5 +1,4 @@
-import { useEffect, useRef } from "react";
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { Icon } from "./Icon";
 
 export function StoryModal({
@@ -11,46 +10,103 @@ export function StoryModal({
   onClose: () => void;
   children: ReactNode;
 }) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-
+  const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    dialog.showModal();
-    return () => dialog.close();
+    const element = dialog.current;
+    element?.showModal();
+    return () => element?.close();
   }, []);
-
   return (
     <dialog
-      ref={dialogRef}
-      className="m-auto rounded-xl border border-[#40514f] bg-[#19272e] p-6 text-[#f0f3f2] shadow-2xl backdrop:bg-[#071018]/70 backdrop:blur-sm max-w-lg w-full"
-      onCancel={(e) => {
-        e.preventDefault();
+      ref={dialog}
+      className="story-modal"
+      aria-labelledby="story-modal-title"
+      onCancel={(event) => {
+        event.preventDefault();
         onClose();
       }}
-      onClick={(e) => {
-        if (e.target !== e.currentTarget) return;
-        const b = e.currentTarget.getBoundingClientRect();
-        if (
-          e.clientX < b.left ||
-          e.clientX > b.right ||
-          e.clientY < b.top ||
-          e.clientY > b.bottom
-        )
-          onClose();
-      }}
     >
-      <div className="flex items-center justify-between mb-5 border-b border-[#2c373e] pb-3">
-        <h2 className="text-xl font-bold">{title}</h2>
-        <button
-          className="btn btn-ghost btn-circle btn-sm"
-          onClick={onClose}
-          aria-label="닫기"
-        >
-          <Icon name="close" className="w-5 h-5 text-gray-400" />
+      <div className="modal-heading">
+        <h2 id="story-modal-title">{title}</h2>
+        <button className="icon-button" onClick={onClose} aria-label="닫기">
+          <Icon name="close" />
         </button>
       </div>
       {children}
     </dialog>
+  );
+}
+
+// 장면 안에서 열려도 배경과 대화창의 크기는 그대로 유지한다.
+export function ScenePopup({
+  title,
+  onClose,
+  children,
+  actions,
+  alert = false,
+  className = "",
+}: {
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+  actions?: ReactNode;
+  alert?: boolean;
+  className?: string;
+}) {
+  const panel = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const previous =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    const first = panel.current?.querySelector<HTMLElement>("input, button");
+    (first ?? panel.current)?.focus({ preventScroll: true });
+    return () => {
+      if (previous?.isConnected) previous.focus({ preventScroll: true });
+    };
+  }, []);
+  return (
+    <div className="scene-popup-layer">
+      <div
+        className={"scene-popup " + (alert ? "warning-popup " : "") + className}
+        role={alert ? "alertdialog" : "dialog"}
+        aria-modal="true"
+        aria-label={title}
+        ref={panel}
+        tabIndex={-1}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            event.stopPropagation();
+            onClose();
+          }
+          if (event.key !== "Tab") return;
+          const elements = panel.current?.querySelectorAll<HTMLElement>(
+            "button:not(:disabled),input,a[href],summary",
+          );
+          if (!elements?.length) return;
+          const first = elements[0];
+          const last = elements[elements.length - 1];
+          if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+          }
+        }}
+      >
+        <div className="popup-heading">
+          <span className="popup-icon">
+            <Icon name={alert ? "info" : "book"} />
+          </span>
+          <h2>{title}</h2>
+          <button className="icon-button" onClick={onClose} aria-label="닫기">
+            <Icon name="close" />
+          </button>
+        </div>
+        <div className="popup-body">{children}</div>
+        {actions && <div className="popup-actions">{actions}</div>}
+      </div>
+    </div>
   );
 }

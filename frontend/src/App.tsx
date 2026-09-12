@@ -1,389 +1,424 @@
 import { useEffect, useRef, useState } from "react";
+import { OnboardingModal } from "./components/OnboardingModal";
 import { Header } from "./components/Header";
-import { StageBar } from "./components/StageBar";
+import { SceneImagePreloader } from "./components/Journal";
 import { AppModals } from "./components/modals/AppModals";
-import { homes, inspections, talkItems } from "./data";
 import {
-  routes,
-  labels,
+  parseRecommendation,
+  getCheckpoints,
+  getEnding,
+  getSteps,
+  makeNewGame,
+  restoreGame,
+  rewindGame,
+  selectedHome,
+} from "./data";
+import {
   STORAGE_KEY,
-  type Scene,
-  type Contract,
-  type Inspection,
-  type ModalKind,
-  type Note,
   type GameState,
+  type ModalKind,
+  type PlayViewProps,
 } from "./types";
 import { ChooseView } from "./views/ChooseView";
 import { DocumentView } from "./views/DocumentView";
 import { ExploreView } from "./views/ExploreView";
 import { HomeView } from "./views/HomeView";
 import { TalkView } from "./views/TalkView";
-import { OnboardingModal } from "./components/OnboardingModal";
 
-// 실제 서버 API 기본 주소 (필요에 따라 변경)
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost";
-
-// 서버 응답 타입
-type ServerRecommendationResponse = {
-  first: "월세" | "전세 + 대출" | string;
-  second:
-    | "원룸"
-    | "오피스텔"
-    | "빌라"
-    | "옥탑방"
-    | "반지하"
-    | "고시원"
-    | string;
-};
-
-// 1차 분기 매핑
-function mapContract(first: string): Contract {
-  if (first.includes("전세")) return "jeonse";
-  return "monthly";
-}
-
-// 2차 분기 인덱스 1:1 매핑 (homes 배열의 순서와 일치)
-const HOUSE_INDEX_MAP: Record<string, number> = {
-  원룸: 0, // 원룸(다가구)
-  오피스텔: 1, // 오피스텔
-  빌라: 2, // 빌라(다세대)
-  옥탑방: 3, // 옥탑방
-  반지하: 4, // 반지하
-  고시원: 5, // 고시원
-};
-
-function mapHouseIndex(second: string): number {
-  // 정의된 6개 키워드 중 하나면 해당 인덱스 반환, 예외적인 값이면 기본값 0(원룸)
-  return HOUSE_INDEX_MAP[second] ?? 0;
-}
-
-const makeNewGame = (): GameState => ({
-  started: false,
-  contract: "monthly",
-  house: 0,
-  scene: "choose",
-  notes: [],
-  inspected: [],
-  talked: [],
-  docTab: "owner",
-  ownerChecked: false,
-  completed: false,
-});
-
-const isScene = (v: unknown): v is Scene => routes.some((s) => s === v);
-const currentRoute = (): Scene => {
-  const hash = window.location.hash.slice(1);
-  return isScene(hash) ? hash : "home";
-};
+const THEME_KEY = "eotteokhajip-theme";
+const INTRO_KEY = "eotteokhajip-onboarding-seen";
+const API_BASE_URL = (
+  import.meta.env.VITE_API_BASE_URL || "http://localhost"
+).replace(/\/$/, "");
 
 export default function App() {
   const [game, setGame] = useState<GameState>(() => {
     try {
-      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null");
-      if (saved && typeof saved.started === "boolean") return saved;
-    } catch {}
-    return makeNewGame();
+      return restoreGame(localStorage.getItem(STORAGE_KEY));
+    } catch {
+      return makeNewGame();
+    }
   });
-
-  const [route, setRoute] = useState<Scene>(currentRoute);
-  const [detail, setDetail] = useState<Inspection | null>(null);
-  const [dialogue, setDialogue] = useState<number | null>(null);
+  const [showHome, setShowHome] = useState(false);
+  const [replayVersion, setReplayVersion] = useState(0);
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    try {
+      return localStorage.getItem(THEME_KEY) === "dark" ? "dark" : "light";
+    } catch {
+      return "light";
+    }
+  });
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    try {
+      return localStorage.getItem(INTRO_KEY) !== "true";
+    } catch {
+      return false;
+    }
+  });
+  const [recommendation, setRecommendation] = useState("");
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute("content", theme === "light" ? "#ffffff" : "#11191f");
+    try {
+      localStorage.setItem(THEME_KEY, theme);
+    } catch {
+      /* 화면 전환은 저장 없이도 동작한다. */
+    }
+  }, [theme]);
+  function finishOnboarding() {
+    try {
+      localStorage.setItem(INTRO_KEY, "true");
+    } catch {
+      /* 저장을 허용하지 않는 브라우저 */
+    }
+    setShowOnboarding(false);
+  }
+  async function handleStartWithAI(input: string, signal: AbortSignal) {
+    const timeout = new AbortController();
+    const timer = window.setTimeout(() => timeout.abort(), 15000);
+    try {
+      const response = await fetch(
+        API_BASE_URL + "/api?text=" + encodeURIComponent(input),
+        { signal: AbortSignal.any([signal, timeout.signal]) },
+      );
+      if (!response.ok)
+        throw new Error(
+          "추천 서버에 연결하지 못했습니다. 다시 시도하거나 조건을 직접 선택해주세요.",
+        );
+      const result = parseRecommendation(await response.json());
+      if (signal.aborted) return;
+      setGame({ ...makeNewGame(), ...result, page: "contract" });
+      setRecommendation(
+        "AI가 고른 조건: " +
+          (result.contract === "monthly" ? "월세" : "전세 + 대출") +
+          " · " +
+          selectedHome({ ...makeNewGame(), ...result }).name,
+      );
+      setShowHome(false);
+    } catch (error) {
+      if (signal.aborted) return;
+      if (timeout.signal.aborted)
+        throw new Error(
+          "추천 응답이 늦어지고 있습니다. 다시 시도하거나 조건을 직접 선택해주세요.",
+          { cause: error },
+        );
+      throw error instanceof TypeError
+        ? new Error(
+            "추천 서버에 연결하지 못했습니다. 조건을 직접 선택할 수 있습니다.",
+            { cause: error },
+          )
+        : error;
+    } finally {
+      window.clearTimeout(timer);
+    }
+  }
   const [modal, setModal] = useState<ModalKind>(null);
-  const [toast, setToast] = useState<string | null>(null);
-  const [showOnboarding, setShowOnboarding] = useState(false); // 수동 다시보기용 (선택사항)
-  const appRef = useRef<HTMLDivElement>(null);
+  const [storageFailed, setStorageFailed] = useState(false);
+  const appRef = useRef<HTMLElement>(null);
+  const home = selectedHome(game);
+  const steps = getSteps(game);
+  const index = Math.max(
+    0,
+    steps.findIndex((step) => step.id === game.cursor),
+  );
+  const step = steps[index];
+  const notes = getCheckpoints(game);
+  const answered = Object.hasOwn(game.answers, step.id);
+  const selected = game.answers[step.id] ?? game.drafts[step.id] ?? [];
+  const feedback = notes.filter((n) => n.stepId === step.id);
+  const isHome = showHome || game.page === "home";
+  const ending = game.page === "ending" && !showHome;
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(game));
-    } catch {}
+    // 체크박스를 연속으로 누를 때 저장을 합치고, 실패도 화면에 알린다.
+    const timer = window.setTimeout(() => {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(game));
+        setStorageFailed(false);
+      } catch {
+        setStorageFailed(true);
+      }
+    }, 100);
+    return () => window.clearTimeout(timer);
   }, [game]);
 
   useEffect(() => {
-    document.title = `${route === "home" ? "처음 만나는 나의 집" : labels[route]} | 어떡하집`;
+    const label = isHome
+      ? "처음 만나는 나의 집"
+      : ending
+        ? "이야기의 끝"
+        : game.page === "play"
+          ? step.title
+          : "첫 집을 고르다";
+    document.title = label + " | 어떡하집?";
+    window.history.replaceState(
+      null,
+      "",
+      "#" + (isHome ? "home" : game.page === "play" ? step.id : game.page),
+    );
     window.scrollTo({ top: 0, behavior: "instant" });
-  }, [route]);
+    appRef.current?.focus({ preventScroll: true });
+  }, [game.page, game.cursor, isHome, ending, step.title, step.id]);
 
-  useEffect(() => {
-    const handlePopState = () => {
-      const next = currentRoute();
-      setRoute(next);
-      setDetail(null);
-      setDialogue(null);
-      setModal(null);
-      if (next !== "home")
-        setGame((prev) => ({ ...prev, started: true, scene: next }));
-    };
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
-  }, []);
-
-  useEffect(() => {
-    if (!toast) return;
-    const timer = setTimeout(() => setToast(null), 2800);
-    return () => clearTimeout(timer);
-  }, [toast]);
-
-  // 키보드 1, 2, 3 숫자 단축키
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (modal || e.repeat || !["1", "2", "3"].includes(e.key)) return;
       if (
-        e.target instanceof HTMLElement &&
-        e.target.closest("input,textarea,select")
+        modal ||
+        showOnboarding ||
+        e.repeat ||
+        e.ctrlKey ||
+        e.altKey ||
+        e.metaKey ||
+        !/^[1-9]$/.test(e.key)
       )
         return;
-      const btn = appRef.current?.querySelectorAll<HTMLButtonElement>(
+      if (
+        e.target instanceof HTMLElement &&
+        e.target.closest(
+          'input,textarea,select,button,summary,a,[role="dialog"],[role="alertdialog"]',
+        )
+      )
+        return;
+      const button = appRef.current?.querySelectorAll<HTMLButtonElement>(
         ".choices-container button",
       )[Number(e.key) - 1];
-      if (btn) {
+      if (button && !button.disabled) {
         e.preventDefault();
-        btn.click();
+        button.click();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [modal]);
+  }, [modal, showOnboarding]);
 
-  function navigate(scene: Scene) {
+  function restart(mode: "start" | "same" | "other" = "start") {
     setModal(null);
-    setDetail(null);
-    setDialogue(null);
-    setRoute(scene);
-    if (scene !== "home")
-      setGame((prev) => ({ ...prev, started: true, scene }));
-    if (window.location.hash !== `#${scene}`)
-      window.history.pushState(null, "", `#${scene}`);
+    setShowHome(false);
+    setRecommendation("");
+    setGame((previous) => ({
+      ...makeNewGame(),
+      page:
+        mode === "same" ? "play" : mode === "other" ? "contract" : "prologue",
+      contract: mode === "start" ? "monthly" : previous.contract,
+      house: mode === "start" ? "oneroom" : previous.house,
+    }));
   }
-
-  function recordNote(note: Note) {
-    if (!game.notes.some((item) => item.id === note.id)) {
-      setToast("수첩에 새로운 발견을 기록했어요.");
-      setGame((prev) => ({ ...prev, notes: [...prev.notes, note] }));
-    }
+  function replay(stepId: string) {
+    setGame((previous) => rewindGame(previous, stepId));
+    setReplayVersion((version) => version + 1);
+    setShowHome(false);
+    setModal(null);
   }
-
-  // 서버 API 호출 및 결과 자동 적용 핸들러
-  async function handleStartWithAI(input: string) {
-    try {
-      const encodedQuery = encodeURIComponent(input);
-      const res = await fetch(`${API_BASE_URL}/api?text=${encodedQuery}`);
-
-      if (!res.ok) {
-        throw new Error(`서버 응답 오류: ${res.status}`);
-      }
-
-      const data: ServerRecommendationResponse = await res.json();
-
-      const contract = mapContract(data.first);
-      const houseIndex = mapHouseIndex(data.second);
-      const targetHome = homes[houseIndex];
-
-      // LLM이 골라준 조건으로 세팅하고 목적지를 'choose'로 지정
-      setGame({
-        ...makeNewGame(),
-        started: true,
-        contract,
-        house: houseIndex,
-        scene: "choose", // <-- explore 대신 choose로 이동
-        notes: [
-          {
-            id: "ai-prompt",
-            title: "AI 추천 계약 및 집 조건",
-            text: `“${input}” 상황을 바탕으로 [${data.first}] / [${targetHome.name}] 조건을 추천받았습니다.`,
-          },
-        ],
-      });
-
-      setToast(
-        `AI가 [${data.first}] · [${targetHome.name}]을(를) 골라두었어요!`,
-      );
-      navigate("choose"); // <-- ChooseView 화면으로 전환
-    } catch (error) {
-      console.error("AI 추천 호출 실패:", error);
-      setToast("서버 연결에 실패하여 기본 선택 화면으로 이동합니다.");
-
-      setGame({
-        ...makeNewGame(),
-        started: true,
-        contract: "monthly",
-        house: 0,
-        scene: "choose",
-      });
-      navigate("choose");
-    }
+  function choose(id: string) {
+    if (
+      answered ||
+      !step.choices?.some(
+        (choice) => choice.id === id && !choice.disabledReason,
+      )
+    )
+      return;
+    setGame((previous) => ({
+      ...previous,
+      answers: { ...previous.answers, [step.id]: [id] },
+    }));
   }
-
-  function handleInspect(key: Inspection) {
-    setDetail(key);
-    if (!game.inspected.includes(key)) {
-      setGame((prev) => ({ ...prev, inspected: [...prev.inspected, key] }));
-    }
-    recordNote({
-      id: key,
-      title: inspections[key].title,
-      text: inspections[key].note,
+  function toggle(id: string) {
+    if (answered || !step.items?.some((item) => item.id === id)) return;
+    setGame((previous) => {
+      const current = previous.drafts[step.id] ?? [];
+      const item = step.items!.find((item) => item.id === id)!;
+      const commonCount = step.items!.filter(
+        (item) => !item.extra && current.includes(item.id),
+      ).length;
+      if (
+        step.kind === "inspection" &&
+        !item.extra &&
+        !current.includes(id) &&
+        commonCount >= 5
+      )
+        return previous;
+      return {
+        ...previous,
+        drafts: {
+          ...previous.drafts,
+          [step.id]: current.includes(id)
+            ? current.filter((key) => key !== id)
+            : [...current, id],
+        },
+      };
     });
   }
-
-  function handleAskQuestion(index: number) {
-    const item = talkItems[index];
-    setDialogue(index);
-    if (!game.talked.includes(item.id)) {
-      setGame((prev) => ({ ...prev, talked: [...prev.talked, item.id] }));
-    }
-    recordNote({
-      id: item.id,
-      title: item.title,
-      text: item.note(game.contract),
+  function submit() {
+    if (
+      step.requireAll &&
+      !step.items?.every((item) => selected.includes(item.id))
+    )
+      return;
+    if (!answered)
+      setGame((previous) => ({
+        ...previous,
+        answers: {
+          ...previous.answers,
+          [step.id]: previous.drafts[step.id] ?? [],
+        },
+      }));
+  }
+  function next() {
+    if (
+      step.requireAll &&
+      !step.items?.every((item) => selected.includes(item.id))
+    )
+      return;
+    if (step.kind !== "info" && step.kind !== "recap" && !answered) return;
+    setGame((previous) => {
+      const updated = {
+        ...previous,
+        answers: {
+          ...previous.answers,
+          [step.id]: previous.answers[step.id] ?? ["read"],
+        },
+      };
+      const currentSteps = getSteps(updated);
+      const nextStep =
+        currentSteps[currentSteps.findIndex((item) => item.id === step.id) + 1];
+      return {
+        ...updated,
+        page: nextStep ? "play" : "ending",
+        cursor: nextStep?.id ?? step.id,
+      };
     });
   }
-
-  function handleCheckNames() {
-    setGame((prev) => ({ ...prev, ownerChecked: true, docTab: "owner" }));
-    recordNote({
-      id: "owner",
-      title: "서로 다른 두 이름",
-      text: "등기상 소유자는 김민수, 전달받은 계좌의 예금주는 박지훈. 관계와 권한을 확인하기 전 송금을 보류하기.",
+  function setupNext() {
+    setGame((previous) => {
+      if (previous.page === "prologue")
+        return previous.prologue < 2
+          ? { ...previous, prologue: previous.prologue + 1 }
+          : { ...previous, page: "contract" };
+      if (previous.page === "contract")
+        return { ...previous, page: "tutorial" };
+      if (previous.page === "tutorial") return { ...previous, page: "house" };
+      if (previous.contract === "jeonse" && previous.house === "goshiwon")
+        return previous;
+      return { ...previous, page: "play", cursor: "listing" };
     });
   }
+  const playProps: PlayViewProps = {
+    step,
+    selected,
+    answered,
+    notes,
+    feedback,
+    onChoose: choose,
+    onToggle: toggle,
+    onSubmit: submit,
+    onNext: next,
+    onRetry: () => replay(step.id),
+  };
+  const homeProps = {
+    started: game.page !== "home",
+    onStartNew: () => (game.page !== "home" ? setModal("new") : restart()),
+    onChooseConditions: () =>
+      game.page === "play" || game.page === "ending"
+        ? setModal("conditions")
+        : restart("other"),
+    onResume: () => setShowHome(false),
+    onReplay: replay,
+    onSameHome: () => restart("same"),
+    onOtherHome: () => restart("other"),
+    onStartWithAI: handleStartWithAI,
+    onAppendix: () => setModal("appendix"),
+  };
 
   return (
-    <div
-      ref={appRef}
-      className="min-h-screen bg-[#11191f] text-[#f0f3f2] flex flex-col"
-    >
-      {/* 첫 방문 시 자동으로 슬라이드 팝업 실행 */}
-      <OnboardingModal
-        forceOpen={showOnboarding}
-        onFinish={() => setShowOnboarding(false)}
-      />
-
+    <div className="app-shell">
+      <SceneImagePreloader />
       <Header
-        onNavigate={navigate}
-        onOpenModal={(kind) => {
-          if (kind === "guide") {
-            setShowOnboarding(true); // 헤더의 ? 아이콘을 눌렀을 때 온보딩을 다시 보게 해도 좋습니다.
-          } else {
-            setModal(kind);
-          }
-        }}
+        onHome={() => setShowHome(true)}
+        onGuide={() => setShowOnboarding(true)}
+        theme={theme}
+        onToggleTheme={() => setTheme(theme === "light" ? "dark" : "light")}
       />
-
-      <main
-        tabIndex={-1}
-        className="flex-1 max-w-5xl w-full mx-auto px-4 pb-12 focus:outline-none"
-      >
-        {route !== "home" && (
-          <StageBar currentScene={route} onNavigate={navigate} />
+      <main ref={appRef} tabIndex={-1} className="app-main">
+        {storageFailed && (
+          <div className="storage-notice" role="status">
+            브라우저에 진행 기록을 저장할 수 없어요. 이 창에서는 계속 진행할 수
+            있지만 새로고침하면 기록이 사라질 수 있어요.
+          </div>
         )}
-
-        {route === "home" && (
-          <HomeView
-            onStartWithAI={handleStartWithAI}
-            onNavigate={navigate}
-            started={game.started}
-            lastScene={game.scene}
-          />
-        )}
-
-        {route === "choose" && (
+        {isHome ? (
+          <HomeView {...homeProps} />
+        ) : ending ? (
+          <>
+            <HomeView {...homeProps} ending={getEnding(game)} notes={notes} />
+          </>
+        ) : game.page !== "play" ? (
           <ChooseView
+            key={game.page + ":" + game.contract}
+            page={game.page}
+            prologue={game.prologue}
+            recommendation={recommendation}
+            home={home}
             contract={game.contract}
-            currentHouse={game.house}
-            onChooseContract={(c: Contract) =>
-              setGame((p) => ({
-                ...makeNewGame(),
-                started: true,
-                house: p.house,
-                contract: c,
+            onChooseContract={(contract) =>
+              setGame((previous) => ({
+                ...previous,
+                contract,
+                house:
+                  contract === "jeonse" && previous.house === "goshiwon"
+                    ? "oneroom"
+                    : previous.house,
               }))
             }
-            onChooseHome={(idx: number) =>
-              setGame((p) => ({
-                ...makeNewGame(),
-                started: true,
-                contract: p.contract,
-                house: idx,
+            onChooseHome={(house) =>
+              setGame((previous) =>
+                previous.contract === "jeonse" && house === "goshiwon"
+                  ? previous
+                  : { ...previous, house },
+              )
+            }
+            onNext={setupNext}
+            onBack={() =>
+              setGame((previous) => ({
+                ...previous,
+                page:
+                  previous.page === "house"
+                    ? "tutorial"
+                    : previous.page === "tutorial"
+                      ? "contract"
+                      : "prologue",
               }))
             }
-            onNext={() => navigate("explore")}
           />
-        )}
-
-        {route === "explore" && (
-          <ExploreView
-            home={homes[game.house]}
-            notes={game.notes}
-            inspected={game.inspected}
-            detail={detail}
-            onInspect={handleInspect}
-            onNext={() =>
-              game.inspected.length < 3
-                ? setModal("explore-warning")
-                : navigate("talk")
-            }
-            onOpenNotebook={() => setModal("notebook")}
-          />
-        )}
-
-        {route === "talk" && (
-          <TalkView
-            contract={game.contract}
-            notes={game.notes}
-            talked={game.talked}
-            dialogue={dialogue}
-            onAskQuestion={handleAskQuestion}
-            onNext={() => navigate("document")}
-            onOpenNotebook={() => setModal("notebook")}
-          />
-        )}
-
-        {route === "document" && (
-          <DocumentView
-            house={game.house}
-            docTab={game.docTab}
-            ownerChecked={game.ownerChecked}
-            onCheckNames={handleCheckNames}
-            onComplete={() => {
-              handleCheckNames();
-              setGame((p) => ({ ...p, completed: true }));
-              recordNote({
-                id: "pause",
-                title: "확인할 때까지 기다리기로 했다",
-                text: "이름이 다른 이유와 대리권 관련 자료를 요청했다. 확인 전에는 돈을 보내지 않기로 했다.",
-              });
-              setModal("ending");
-            }}
-            onSendWarning={() => setModal("send-warning")}
-            onOpenGuide={() => setModal("document-guide")}
-          />
+        ) : (
+          <>
+            <div className="play-layout">
+              <div className="play-main" key={step.id + ":" + replayVersion}>
+                {step.kind === "inspection" ? (
+                  <ExploreView {...playProps} />
+                ) : step.kind === "checklist" ||
+                  step.document === "registry" ||
+                  step.document === "lease" ? (
+                  <DocumentView
+                    {...playProps}
+                    home={home}
+                    contract={game.contract}
+                  />
+                ) : (
+                  <TalkView {...playProps} />
+                )}
+              </div>
+            </div>
+          </>
         )}
       </main>
-
-      <footer className="border-t border-[#2c373e] py-6 text-center text-xs text-gray-500">
-        어떡하집 · 모든 첫 독립에는 연습이 필요하니까
-      </footer>
-
+      {showOnboarding && <OnboardingModal onFinish={finishOnboarding} />}
       <AppModals
         modal={modal}
-        notes={game.notes}
-        currentRoute={route}
         onClose={() => setModal(null)}
-        onStartNew={() => {
-          setGame(makeNewGame());
-          navigate("choose");
-        }}
-        onNavigate={navigate}
-        onConfirmWarning={handleCheckNames}
+        onStartNew={() => restart(modal === "conditions" ? "other" : "start")}
       />
-
-      {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-[#c3dfc8] text-[#1a3928] px-4 py-2 rounded-lg text-xs font-semibold shadow-lg pointer-events-none z-50">
-          {toast}
-        </div>
-      )}
     </div>
   );
 }
