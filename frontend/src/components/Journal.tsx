@@ -2,87 +2,180 @@ import { useState, type ReactNode } from "react";
 import { dictionary } from "../data";
 import type { Background } from "../types";
 import { Icon } from "./Icon";
+import { ScenePopup } from "./StoryModal";
 
-const backgrounds = {
-  home: { description: "집에서 고민하고 있는 사진", specified: true },
+const backgrounds: Record<
+  Background,
+  { description: string; specified: boolean }
+> = {
+  home: { description: "부동산 앱을 보고 있는 사진", specified: true },
   app: { description: "부동산 앱을 보고 있는 사진", specified: true },
-  office: { description: "부동산 사진", specified: true },
-  agent: { description: "중개사 사진", specified: true },
+  listing: { description: "매물 문의창이 떠 있는 사진", specified: true },
+  message: {
+    description: "화면에 메시지를 주고받은 텍스트의 사진",
+    specified: true,
+  },
+  office: { description: "부동산 사진, 중개사 검은 실루엣", specified: true },
+  agent: { description: "중개사 이미지", specified: true },
   lease: { description: "계약서 사진", specified: true },
-  room: { description: "창문·욕실·싱크대가 보이는 임장 중인 집 내부", specified: false },
+  moving: { description: "입주하는 이미지", specified: true },
+  room: {
+    description: "선택한 집의 창문·욕실·싱크대가 보이는 내부",
+    specified: false,
+  },
   street: { description: "집을 알아보며 걷는 주택가 골목", specified: false },
-  moving: { description: "이삿짐 상자가 놓인 입주 당일의 방", specified: false },
-  rain: { description: "빗물이 흐르는 창문과 장마철의 방 안", specified: false },
+  rain: {
+    description: "빗물이 흐르는 창문과 장마철의 방 안",
+    specified: false,
+  },
 };
 
-// 기존 사이드 패널 자리에 장면과 무관하게 열람할 수 있는 용어 사전을 둔다.
-function Dictionary({ context }: { context: string }) {
+function Dictionary({
+  context,
+  onClose,
+}: {
+  context: string;
+  onClose: () => void;
+}) {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState<string | null>(null);
   const search = query.trim();
   const relevant = dictionary.filter((entry) =>
-    [entry.term, ...(entry.aliases ?? [])].some((term) => context.includes(term)),
+    [entry.term, ...(entry.aliases ?? [])].some((term) =>
+      context.includes(term),
+    ),
   );
   const entries = search
-    ? dictionary.filter((entry) =>
-        [entry.term, entry.meaning, ...(entry.aliases ?? [])]
-          .join(" ").includes(search),
-      ).sort((a, b) => Number(b.term === search) - Number(a.term === search) || Number(b.term.includes(search)) - Number(a.term.includes(search)))
-    : relevant.length ? relevant : dictionary.slice(0, 5);
+    ? dictionary
+        .filter((entry) =>
+          [entry.term, entry.meaning, ...(entry.aliases ?? [])]
+            .join(" ")
+            .includes(search),
+        )
+        .sort(
+          (a, b) =>
+            Number(b.term === search) - Number(a.term === search) ||
+            Number(b.term.includes(search)) - Number(a.term.includes(search)),
+        )
+    : relevant.length
+      ? relevant
+      : dictionary;
   const selected = entries.find((entry) => entry.term === active) ?? entries[0];
   return (
-    <aside className="dictionary" aria-label="용어 사전">
-      <details className="dictionary-disclosure" open>
-        <summary><Icon name="book" /><span>사전</span><Icon name="arrow" /></summary>
-        <div className="dictionary-body">
-          <label className="dictionary-search">
-            <span className="sr-only">용어 검색</span>
-            <input type="search" placeholder="궁금한 단어 찾기" value={query}
-              onChange={(event) => { setQuery(event.target.value); setActive(null); }} />
-          </label>
-          <p className="dictionary-caption">{query.trim() ? "검색 결과" : "이 장면의 단어"}</p>
-          <div className="dictionary-terms">
-            {entries.map((entry) => (
-              <button key={entry.term} aria-pressed={selected?.term === entry.term}
-                onClick={() => setActive(entry.term)}>{entry.term}</button>
-            ))}
-          </div>
-          {selected ? (
-            <div className="dictionary-definition" aria-live="polite">
-              <h2>{selected.term}</h2>
-              <p>{selected.meaning}</p>
-            </div>
-          ) : <p className="dictionary-empty">찾는 단어가 없습니다.</p>}
+    <ScenePopup
+      title="용어 사전"
+      onClose={onClose}
+      className="dictionary-popup"
+    >
+      <label className="dictionary-search">
+        <span className="sr-only">용어 검색</span>
+        <input
+          autoFocus
+          type="search"
+          placeholder="궁금한 단어를 찾아보세요"
+          value={query}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setActive(null);
+          }}
+        />
+      </label>
+      <p className="dictionary-caption">
+        {search
+          ? "검색 결과"
+          : relevant.length
+            ? "이 장면의 단어"
+            : "계약 용어"}
+      </p>
+      <div className="dictionary-terms">
+        {entries.map((entry) => (
+          <button
+            key={entry.term}
+            aria-pressed={selected?.term === entry.term}
+            onClick={() => setActive(entry.term)}
+          >
+            {entry.term}
+          </button>
+        ))}
+      </div>
+      {selected ? (
+        <div className="dictionary-definition" aria-live="polite">
+          <h3>{selected.term}</h3>
+          <p>{selected.meaning}</p>
         </div>
-      </details>
-    </aside>
+      ) : (
+        <p className="dictionary-empty">찾는 단어가 없습니다.</p>
+      )}
+    </ScenePopup>
   );
 }
 
-export function SceneFrame({ background, context = "", scene, children, className = "" }: {
+export function SceneFrame({
+  background,
+  context = "",
+  scene,
+  overlay,
+  children,
+  className = "",
+}: {
   background: Background;
   context?: string;
   scene?: ReactNode;
+  overlay?: ReactNode;
   children: ReactNode;
   className?: string;
 }) {
+  const [dictionaryOpen, setDictionaryOpen] = useState(false);
   const photo = backgrounds[background];
+  const blocked = !!overlay || dictionaryOpen;
   return (
-    <section className={"adventure-scene " + className}>
+    <section
+      className={"adventure-scene " + className}
+      aria-label="이야기 장면"
+    >
       <div className={"scene-visual " + (scene ? "has-content" : "")}>
-        <div className="background-placeholder" role="img" aria-label={photo.description}>
-          <span>{photo.specified ? "시나리오 지정 이미지" : "배경 이미지 제안"}</span>
-          <p>{photo.description}</p>
+        <div className="scene-base" inert={blocked}>
+          <div
+            className="background-placeholder"
+            role="img"
+            aria-label={photo.description}
+          >
+            <Icon name="window" />
+            <span>{photo.specified ? "시나리오 이미지" : "이미지 제안"}</span>
+            <p>{photo.description}</p>
+          </div>
+          <div className="scene-content">{scene}</div>
+          <button
+            className="dictionary-trigger"
+            onClick={() => setDictionaryOpen(true)}
+            aria-label="용어 사전 열기"
+            aria-expanded={dictionaryOpen}
+          >
+            <Icon name="book" />
+            <span>사전</span>
+          </button>
         </div>
-        <div className="scene-content">{scene}</div>
-        <Dictionary context={context} />
+        {overlay}
+        {dictionaryOpen && !overlay && (
+          <Dictionary
+            context={context}
+            onClose={() => setDictionaryOpen(false)}
+          />
+        )}
       </div>
-      {children}
+      <div className="dialogue-slot" inert={blocked}>
+        {children}
+      </div>
     </section>
   );
 }
 
-export function DialogueBox({ speaker, text, children, actions }: {
+export function DialogueBox({
+  speaker,
+  text,
+  children,
+  actions,
+}: {
   speaker?: string;
   text?: string;
   children?: ReactNode;
@@ -90,17 +183,40 @@ export function DialogueBox({ speaker, text, children, actions }: {
 }) {
   return (
     <div className="dialogue-box">
-      {speaker && <div className="speaker-name">{speaker}</div>}
-      {text && <p key={text} className="dialogue-text view-enter" aria-live="polite">{text}</p>}
-      {children}
+      <div className="speaker-row">
+        {speaker && (
+          <span className="speaker-name">
+            <span className="speaker-dot" />
+            {speaker}
+          </span>
+        )}
+      </div>
+      <div className="dialogue-body" key={text}>
+        {text && (
+          <p className="dialogue-text view-enter" aria-live="polite">
+            {text}
+          </p>
+        )}
+        {children}
+      </div>
       <div className="dialogue-actions">{actions}</div>
     </div>
   );
 }
 
-export function NextButton({ onClick, children = "다음" }: {
+export function NextButton({
+  onClick,
+  children = "다음",
+  disabled = false,
+}: {
   onClick: () => void;
   children?: ReactNode;
+  disabled?: boolean;
 }) {
-  return <button className="primary-button" onClick={onClick}>{children}<Icon name="arrow" /></button>;
+  return (
+    <button className="primary-button" disabled={disabled} onClick={onClick}>
+      {children}
+      <Icon name="arrow" />
+    </button>
+  );
 }

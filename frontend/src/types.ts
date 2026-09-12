@@ -16,9 +16,24 @@ export type Page =
   | "house"
   | "play"
   | "ending";
-export type ModalKind = "new" | null;
-export type Background = "home" | "app" | "room" | "street" | "office" | "agent" | "lease" | "moving" | "rain";
-export type StoryBeat = { text: string; speaker?: string; background?: Background };
+export type ModalKind = "new" | "appendix" | null;
+export type Background =
+  | "home"
+  | "app"
+  | "listing"
+  | "message"
+  | "room"
+  | "street"
+  | "office"
+  | "agent"
+  | "lease"
+  | "moving"
+  | "rain";
+export type StoryBeat = {
+  text: string;
+  speaker?: string;
+  background?: Background;
+};
 
 export type Home = {
   id: HouseId;
@@ -67,7 +82,9 @@ export type Step = {
   background: Background;
   choices?: Choice[];
   items?: CheckItem[];
-  carry?: string;
+  notice?: Feedback;
+  explanation?: Feedback;
+  requireAll?: boolean;
   document?: "registry" | "lease" | "message";
 };
 export type Checkpoint = {
@@ -94,7 +111,7 @@ export type PlayViewProps = {
   onRetry: () => void;
 };
 export type GameState = {
-  version: 2;
+  version: 3;
   page: Page;
   prologue: number;
   contract: Contract;
@@ -139,7 +156,7 @@ export type IconName =
   | "external"
   | "reset";
 
-export const STORAGE_KEY = "eotteokhajip-story-v2";
+export const STORAGE_KEY = "eotteokhajip-story-v3";
 export const STAGES: {
   id: Stage;
   title: string;
@@ -153,7 +170,7 @@ export const STAGES: {
   { id: 5, title: "잔금·입주", description: "내 집이 되는 하루", icon: "home" },
   {
     id: 6,
-    title: "에필로그",
+    title: "엔딩",
     description: "선택이 돌아오는 시간",
     icon: "flag",
   },

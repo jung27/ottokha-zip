@@ -7,114 +7,95 @@ import {
   homes,
   inspectionItems,
   makeNewGame,
+  movingItems,
+  parseRecommendation,
   priceLabel,
   restoreGame,
   rewindGame,
+  explorationScripts,
+  contractScripts,
 } from "./src/data.ts";
 
 function finish(contract, house, mode) {
   const game = { ...makeNewGame(), page: "play", contract, house };
   const visited = [];
-  for (let guard = 0; guard < 40; guard++) {
+  for (let guard = 0; guard < 30; guard++) {
     const steps = getSteps(game);
-    const step = steps.find((s) => s.id === game.cursor);
-    assert.ok(step, "current scene exists");
-    assert.equal(
-      new Set(steps.map((s) => s.id)).size,
-      steps.length,
-      "scene ids are unique",
-    );
+    const step = steps.find((item) => item.id === game.cursor);
+    assert.ok(step);
+    assert.equal(new Set(steps.map((item) => item.id)).size, steps.length);
+    assert.ok(step.background);
+    assert.ok(step.beats.every((beat) => beat.text.trim()));
+    for (const beat of step.beats)
+      if (beat.speaker) assert.doesNotMatch(beat.text, /^[“"‘].*[”"’]$/s);
     visited.push(step);
-    assert.ok(step.beats.length > 0, "every scene has narration or dialogue");
-    assert.ok(step.background, "every scene reserves a background");
-    for (const beat of step.beats) {
-      assert.ok(beat.text.trim(), "no empty dialogue");
-      if (beat.speaker) assert.doesNotMatch(beat.text, /^[“"‘].*[”"’]$/s, "spoken lines have no wrapping quotation marks");
-    }
     if (step.choices) {
-      const choices = step.choices.filter((c) => !c.disabledReason);
       const desired =
         mode === "risk" || (mode === "mixed" && visited.length % 2 === 0)
           ? "risk"
           : "checked";
-      const choice = choices.find((c) => c.status === desired) ?? choices[0];
-      game.answers[step.id] = [choice.id];
-      const feedback = getCheckpoints(game).filter((c) => c.stepId === step.id);
-      assert.equal(feedback.length, 1, "choice produces immediate feedback");
-      assert.equal(feedback[0].status, choice.status);
-      assert.equal(
-        feedback[0].choice,
-        choice.label,
-        "feedback remembers the actual answer",
+      const choice = step.choices.find(
+        (item) => item.status === desired && !item.disabledReason,
       );
+      assert.ok(choice);
+      game.answers[step.id] = [choice.id];
+      const feedback = getCheckpoints(game).filter(
+        (item) => item.stepId === step.id,
+      );
+      assert.equal(feedback.length, 1);
+      assert.equal(feedback[0].status, choice.status);
+      assert.equal(feedback[0].choice, choice.label);
     } else if (step.items) {
-      const common = step.items.filter((i) => !i.extra);
       game.answers[step.id] =
-        mode === "risk"
+        mode === "risk" && !step.requireAll
           ? []
           : step.kind === "inspection"
-            ? [...common.slice(0, 5), ...step.items.filter((i) => i.extra)].map(
-                (i) => i.id,
-              )
-            : step.items.map((i) => i.id);
+            ? [
+                ...step.items.filter((item) => !item.extra).slice(0, 5),
+                ...step.items.filter((item) => item.extra),
+              ].map((item) => item.id)
+            : step.items.map((item) => item.id);
       const missing = step.items.filter(
-        (i) => !game.answers[step.id].includes(i.id),
-      );
-      const warnings = getCheckpoints(game).filter(
-        (c) => c.stepId === step.id && c.status === "risk",
+        (item) => !game.answers[step.id].includes(item.id),
       );
       assert.equal(
-        warnings.length,
+        getCheckpoints(game).filter(
+          (item) => item.stepId === step.id && item.status === "risk",
+        ).length,
         missing.length,
-        "every omitted item immediately becomes red",
       );
     } else game.answers[step.id] = ["read"];
-    const refreshed = getSteps(game);
-    const next = refreshed[refreshed.findIndex((s) => s.id === step.id) + 1];
+    const updated = getSteps(game);
+    const next = updated[updated.findIndex((item) => item.id === step.id) + 1];
     if (!next) {
       game.page = "ending";
       assert.deepEqual(
-        [...new Set(visited.map((s) => s.stage))],
-        [1, 2, 3, 4, 5, 6],
+        [...new Set(visited.map((item) => item.stage))],
+        [1, 2, 3, 4, 5],
       );
-      assert.equal(
-        getEnding(game).id,
-        "complete",
-        "every route reaches the same ending",
-      );
-      assert.equal(
-        getCheckpoints(game).some(
-          (c) => !["checked", "risk"].includes(c.status),
-        ),
-        false,
-        "no yellow state remains",
-      );
-      assert.deepEqual(
-        restoreGame(JSON.stringify(game)),
-        game,
-        "reload preserves completed story",
-      );
+      assert.equal(getEnding(game).id, "complete");
+      assert.equal(visited.at(-1).id, "moving");
+      assert.deepEqual(restoreGame(JSON.stringify(game)), game);
       return game;
     }
     game.cursor = next.id;
   }
-  assert.fail("route failed to end");
+  assert.fail("Story did not reach its single ending");
 }
-
 for (const contract of ["monthly", "jeonse"]) {
   for (const home of homes.filter(
-    (h) => contract === "monthly" || h.jeonse !== null,
+    (item) => contract === "monthly" || item.jeonse !== null,
   )) {
     for (const mode of ["checked", "risk", "mixed"]) {
-      test(`${contract} / ${home.id} / ${mode}: all six stages, immediate warnings, one ending`, () =>
-        finish(contract, home.id, mode));
+      test(contract + " / " + home.id + " / " + mode, () =>
+        finish(contract, home.id, mode),
+      );
     }
   }
 }
-
-test("exact monthly prices and disabled jeonse × goshiwon combination", () => {
+test("six house prices retain the specified monthly amounts", () => {
   assert.deepEqual(
-    homes.map((h) => [h.deposit, h.rent, h.maintenance]),
+    homes.map((home) => [home.deposit, home.rent, home.maintenance]),
     [
       [1000, 55, 8],
       [1000, 65, 12],
@@ -125,91 +106,105 @@ test("exact monthly prices and disabled jeonse × goshiwon combination", () => {
     ],
   );
   assert.match(priceLabel(homes[0], "monthly"), /관리비 8만 원/);
-  assert.equal(homes[0].rent + homes[0].maintenance, 63);
   assert.equal(homes[5].jeonse, null);
-  assert.deepEqual(
-    restoreGame(
-      JSON.stringify({
-        ...makeNewGame(),
-        contract: "jeonse",
-        house: "goshiwon",
-      }),
-    ),
-    makeNewGame(),
-  );
 });
-
-test("each house has ten common inspection points plus its own additional points", () => {
+test("new housing branches each have four choices and exactly one safe answer", () => {
+  for (const scripts of [explorationScripts, contractScripts])
+    for (const script of Object.values(scripts)) {
+      assert.equal(script.choices.length, 4);
+      assert.equal(
+        script.choices.filter((choice) => choice.status === "checked").length,
+        1,
+      );
+      assert.equal(script.choices[2].status, "checked");
+    }
+  assert.equal(
+    explorationScripts.oneroom.text,
+    '광고에는 "5세대 소규모"라고 적혀 있다. 그런데 사진 속 건물은 그보다 커 보인다.',
+  );
+  assert.equal(contractScripts.oneroom.choices[1].status, "risk");
+  assert.match(contractScripts.oneroom.choices[2].label, /확정일자 부여현황/);
+});
+test("listing, deposit and contract speech are separate from narration", () => {
+  const game = { ...makeNewGame(), answers: { deposit: ["owner"] } };
+  const steps = getSteps(game);
+  const listing = steps.find((step) => step.id === "listing");
+  assert.deepEqual(
+    listing.beats.map((beat) => beat.speaker),
+    [undefined, undefined, "중개사 · 문자", undefined, "중개사"],
+  );
+  assert.equal(listing.beats[0].background, "listing");
+  assert.equal(listing.beats[2].background, "message");
+  const clauses = steps.find((step) => step.id === "clauses");
+  assert.equal(clauses.beats[3].text, "넣으실 거 있으세요?");
+  assert.equal(clauses.beats[3].speaker, "중개사");
+});
+test("latest script removes old side stories and places the complete checklist last", () => {
+  const steps = getSteps(makeNewGame());
+  assert.deepEqual(
+    steps.filter((step) => step.stage === 5).map((step) => step.id),
+    ["account", "timing", "settlement", "defect", "moving"],
+  );
+  for (const removed of ["cost", "loan", "recap", "renewal", "return"])
+    assert.ok(!steps.some((step) => step.id === removed));
+  assert.equal(steps.at(-1).requireAll, true);
+  assert.equal(movingItems.length, 6);
+  const saved = {
+    ...makeNewGame(),
+    page: "ending",
+    answers: { moving: ["lock"] },
+  };
+  assert.equal(restoreGame(JSON.stringify(saved)).page, "play");
+  assert.equal(restoreGame(JSON.stringify(saved)).cursor, "moving");
+});
+test("all inspected and skipped items, including house-specific extras, remain in the review", () => {
   for (const home of homes) {
     const items = inspectionItems(home.id);
-    assert.equal(items.filter((i) => !i.extra).length, 10);
-    assert.ok(items.filter((i) => i.extra).length >= 3);
-    assert.equal(new Set(items.map((i) => i.id)).size, items.length);
+    assert.equal(items.filter((item) => !item.extra).length, 10);
+    assert.ok(items.filter((item) => item.extra).length >= 3);
+    assert.equal(new Set(items.map((item) => item.id)).size, items.length);
   }
+  const game = finish("monthly", "oneroom", "checked");
+  const notes = getCheckpoints(game);
+  assert.ok(notes.some((item) => item.status === "checked"));
+  assert.ok(notes.some((item) => item.status === "risk"));
+  assert.ok(
+    notes
+      .find((item) => item.stepId === "listing")
+      .consequence.includes("좋은 조건의 매물로 방문을 유도"),
+  );
+  const risks = notes.filter((item) => item.status === "risk").length;
+  assert.equal(
+    getEnding(game).text,
+    "당신은 이번 계약에서 위험한 선택 " + risks + "번을 했습니다.",
+  );
 });
-
-test("ownership choice opens the correct branch; changing it removes future answers", () => {
+test("replaying a stage retains earlier decisions and clears dependent branches", () => {
   const game = finish("monthly", "oneroom", "checked");
   assert.ok(game.answers.proxy);
   const replayed = rewindGame(game, "deposit");
-  assert.equal(replayed.cursor, "deposit");
-  assert.ok(replayed.answers.inspection, "earlier inspection is preserved");
+  assert.ok(replayed.answers.inspection);
   assert.equal(replayed.answers.proxy, undefined);
-  assert.equal(replayed.answers.return, undefined);
+  assert.equal(replayed.answers.moving, undefined);
   replayed.answers.deposit = ["immediate"];
+  assert.ok(!getSteps(replayed).some((step) => step.id === "proxy"));
   assert.equal(
-    getSteps(replayed).some((s) => s.id === "proxy"),
-    false,
-  );
-  assert.equal(
-    getCheckpoints(replayed).filter(
-      (c) => c.stepId === "deposit" && c.status === "risk",
-    ).length,
+    getCheckpoints(replayed).filter((item) => item.stepId === "deposit").length,
     1,
   );
+  assert.equal(getCheckpoints(rewindGame(game, "listing")).length, 0);
 });
-
-test("final options depend on photos and guarantee application, not on a generic score", () => {
-  const game = finish("jeonse", "villa", "risk");
-  const get = (id) =>
-    getSteps(game)
-      .find((s) => s.id === "return")
-      .choices.find((c) => c.id === id);
-  assert.ok(get("photos").disabledReason);
-  assert.ok(get("claim").disabledReason);
-  game.answers.settlement = ["record"];
-  game.answers.insurance = ["apply"];
-  assert.equal(get("photos").disabledReason, undefined);
-  assert.equal(get("claim").disabledReason, undefined);
-});
-
-test("single ending and final warning list preserve every flagged checkpoint", () => {
-  const game = finish("monthly", "basement", "risk");
-  const risks = getCheckpoints(game).filter((c) => c.status === "risk");
-  assert.ok(risks.length > 20);
-  assert.match(getEnding(game).reasons[0], new RegExp(String(risks.length)));
-  assert.equal(
-    getEnding(game).title,
-    getEnding(finish("monthly", "basement", "checked")).title,
-  );
-  const replayed = rewindGame(game, "listing");
-  assert.equal(
-    getCheckpoints(replayed).length,
-    0,
-    "replaying does not leave stale warnings",
-  );
-});
-
-test("corrupt and obsolete saves fall back safely; unfinished drafts survive reload", () => {
+test("old or malformed saves cannot reinterpret changed scenario choices", () => {
   for (const raw of [
     "null",
     "{",
     "[]",
-    '{"version":1}',
+    JSON.stringify({ ...makeNewGame(), version: 2 }),
     JSON.stringify({ ...makeNewGame(), answers: [] }),
-    JSON.stringify({ ...makeNewGame(), house: "unknown" }),
-  ])
+    JSON.stringify({ ...makeNewGame(), contract: "jeonse", house: "goshiwon" }),
+  ]) {
     assert.deepEqual(restoreGame(raw), makeNewGame());
+  }
   const game = {
     ...makeNewGame(),
     page: "play",
@@ -218,41 +213,25 @@ test("corrupt and obsolete saves fall back safely; unfinished drafts survive rel
   };
   assert.deepEqual(restoreGame(JSON.stringify(game)), game);
 });
-
-test("listing preserves the scenario and separates messages, narration and speech", () => {
-  const listing = getSteps(makeNewGame()).find((step) => step.id === "listing");
-  assert.equal(listing.beats.length, 5);
-  assert.match(listing.beats[0].text, /관리비 8만 원/);
-  assert.equal(listing.beats[1].speaker, undefined);
-  assert.equal(listing.beats[2].speaker, "중개사 · 문자");
-  assert.equal(listing.beats[2].text, "오늘 두 팀 더 보러 오세요. 마음 있으시면 빨리 오셔야 해요.");
-  assert.equal(listing.beats[3].speaker, undefined);
-  assert.equal(listing.beats[4].speaker, "중개사");
-  assert.equal(listing.beats[4].text, "보셨던 방은 방금 나갔어요. 대신 비슷한 방이 하나 있어요. 오신 김에 보고 가시죠.");
-});
-
-test("contract speech and deposit speech have their own beats", () => {
-  const game = { ...makeNewGame(), answers: { deposit: ["owner"] } };
-  const steps = getSteps(game);
-  const deposit = steps.find((step) => step.id === "deposit");
-  assert.equal(deposit.beats[0].speaker, "중개사");
-  assert.equal(deposit.beats[1].speaker, undefined);
-  const proxy = steps.find((step) => step.id === "proxy");
-  assert.equal(proxy.beats[2].speaker, "중개사");
-  const clauses = steps.find((step) => step.id === "clauses");
-  assert.equal(clauses.beats[1].text, "특약사항 칸은 비어 있다.");
-  assert.equal(clauses.beats[3].text, "넣으실 거 있으세요?");
-  assert.equal(clauses.beats[3].speaker, "중개사");
-});
-
-test("epilogue events depend on the actual inspection and repair clause", () => {
-  const game = makeNewGame();
-  const recap = () => getSteps(game).find((step) => step.id === "recap").beats.map((beat) => beat.text).join(" ");
-  assert.match(recap(), /천장에서 물이 샌다/);
-  assert.match(recap(), /그때 하자 수리 특약을 넣었다면/);
-  game.answers.inspection = ["ceiling"];
-  assert.doesNotMatch(recap(), /천장에서 물이 샌다/);
-  game.answers.clauses = ["defects"];
-  assert.match(recap(), /특약을 제시하고/);
-  assert.doesNotMatch(recap(), /그때 하자 수리 특약을 넣었다면/);
+test("main AI responses map to scenario ids and reject incomplete or impossible combinations", () => {
+  assert.deepEqual(parseRecommendation({ first: "월세", second: "원룸" }), {
+    contract: "monthly",
+    house: "oneroom",
+  });
+  assert.deepEqual(
+    parseRecommendation({ first: " {전세 + 대출} ", second: "빌라(다세대)" }),
+    { contract: "jeonse", house: "villa" },
+  );
+  assert.deepEqual(parseRecommendation({ first: "월세", second: "고시원" }), {
+    contract: "monthly",
+    house: "goshiwon",
+  });
+  for (const value of [
+    null,
+    {},
+    { first: 3, second: "원룸" },
+    { first: "매매", second: "빌라" },
+    { first: "전세", second: "고시원" },
+  ])
+    assert.throws(() => parseRecommendation(value));
 });

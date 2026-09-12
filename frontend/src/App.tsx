@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
+import { OnboardingModal } from "./components/OnboardingModal";
 import { Header } from "./components/Header";
 import { AppModals } from "./components/modals/AppModals";
 import {
+  parseRecommendation,
   getCheckpoints,
   getEnding,
   getSteps,
@@ -22,6 +24,12 @@ import { ExploreView } from "./views/ExploreView";
 import { HomeView } from "./views/HomeView";
 import { TalkView } from "./views/TalkView";
 
+const THEME_KEY = "eotteokhajip-theme";
+const INTRO_KEY = "eotteokhajip-onboarding-seen";
+const API_BASE_URL = (
+  import.meta.env.VITE_API_BASE_URL || "http://localhost"
+).replace(/\/$/, "");
+
 export default function App() {
   const [game, setGame] = useState<GameState>(() => {
     try {
@@ -31,6 +39,79 @@ export default function App() {
     }
   });
   const [showHome, setShowHome] = useState(false);
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    try {
+      return localStorage.getItem(THEME_KEY) === "dark" ? "dark" : "light";
+    } catch {
+      return "light";
+    }
+  });
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    try {
+      return localStorage.getItem(INTRO_KEY) !== "true";
+    } catch {
+      return false;
+    }
+  });
+  const [recommendation, setRecommendation] = useState("");
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute("content", theme === "light" ? "#ffffff" : "#11191f");
+    try {
+      localStorage.setItem(THEME_KEY, theme);
+    } catch {
+      /* 화면 전환은 저장 없이도 동작한다. */
+    }
+  }, [theme]);
+  function finishOnboarding() {
+    try {
+      localStorage.setItem(INTRO_KEY, "true");
+    } catch {
+      /* 저장을 허용하지 않는 브라우저 */
+    }
+    setShowOnboarding(false);
+  }
+  async function handleStartWithAI(input: string, signal: AbortSignal) {
+    const timeout = new AbortController();
+    const timer = window.setTimeout(() => timeout.abort(), 15000);
+    try {
+      const response = await fetch(
+        API_BASE_URL + "/api?text=" + encodeURIComponent(input),
+        { signal: AbortSignal.any([signal, timeout.signal]) },
+      );
+      if (!response.ok)
+        throw new Error(
+          "추천 서버에 연결하지 못했습니다. 다시 시도하거나 조건을 직접 선택해주세요.",
+        );
+      const result = parseRecommendation(await response.json());
+      if (signal.aborted) return;
+      setGame({ ...makeNewGame(), ...result, page: "contract" });
+      setRecommendation(
+        "AI가 고른 조건: " +
+          (result.contract === "monthly" ? "월세" : "전세 + 대출") +
+          " · " +
+          selectedHome({ ...makeNewGame(), ...result }).name,
+      );
+      setShowHome(false);
+    } catch (error) {
+      if (signal.aborted) return;
+      if (timeout.signal.aborted)
+        throw new Error(
+          "추천 응답이 늦어지고 있습니다. 다시 시도하거나 조건을 직접 선택해주세요.",
+          { cause: error },
+        );
+      throw error instanceof TypeError
+        ? new Error(
+            "추천 서버에 연결하지 못했습니다. 조건을 직접 선택할 수 있습니다.",
+            { cause: error },
+          )
+        : error;
+    } finally {
+      window.clearTimeout(timer);
+    }
+  }
   const [modal, setModal] = useState<ModalKind>(null);
   const [storageFailed, setStorageFailed] = useState(false);
   const appRef = useRef<HTMLElement>(null);
@@ -83,6 +164,7 @@ export default function App() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (
         modal ||
+        showOnboarding ||
         e.repeat ||
         e.ctrlKey ||
         e.altKey ||
@@ -92,7 +174,9 @@ export default function App() {
         return;
       if (
         e.target instanceof HTMLElement &&
-        e.target.closest("input,textarea,select,button,summary,a")
+        e.target.closest(
+          'input,textarea,select,button,summary,a,[role="dialog"],[role="alertdialog"]',
+        )
       )
         return;
       const button = appRef.current?.querySelectorAll<HTMLButtonElement>(
@@ -105,11 +189,12 @@ export default function App() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [modal]);
+  }, [modal, showOnboarding]);
 
   function restart(mode: "start" | "same" | "other" = "start") {
     setModal(null);
     setShowHome(false);
+    setRecommendation("");
     setGame((previous) => ({
       ...makeNewGame(),
       page:
@@ -163,6 +248,11 @@ export default function App() {
     });
   }
   function submit() {
+    if (
+      step.requireAll &&
+      !step.items?.every((item) => selected.includes(item.id))
+    )
+      return;
     if (!answered)
       setGame((previous) => ({
         ...previous,
@@ -173,6 +263,11 @@ export default function App() {
       }));
   }
   function next() {
+    if (
+      step.requireAll &&
+      !step.items?.every((item) => selected.includes(item.id))
+    )
+      return;
     if (step.kind !== "info" && step.kind !== "recap" && !answered) return;
     setGame((previous) => {
       const updated = {
@@ -225,11 +320,18 @@ export default function App() {
     onReplay: replay,
     onSameHome: () => restart("same"),
     onOtherHome: () => restart("other"),
+    onStartWithAI: handleStartWithAI,
+    onAppendix: () => setModal("appendix"),
   };
 
   return (
     <div className="app-shell">
-      <Header onHome={() => setShowHome(true)} />
+      <Header
+        onHome={() => setShowHome(true)}
+        onGuide={() => setShowOnboarding(true)}
+        theme={theme}
+        onToggleTheme={() => setTheme(theme === "light" ? "dark" : "light")}
+      />
       <main ref={appRef} tabIndex={-1} className="app-main">
         {storageFailed && (
           <div className="storage-notice" role="status">
@@ -248,6 +350,7 @@ export default function App() {
             key={game.page + ":" + game.contract}
             page={game.page}
             prologue={game.prologue}
+            recommendation={recommendation}
             home={home}
             contract={game.contract}
             onChooseContract={(contract) =>
@@ -305,6 +408,7 @@ export default function App() {
           </>
         )}
       </main>
+      {showOnboarding && <OnboardingModal onFinish={finishOnboarding} />}
       <AppModals
         modal={modal}
         onClose={() => setModal(null)}
