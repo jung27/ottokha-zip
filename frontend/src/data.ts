@@ -10,13 +10,55 @@ import type {
   GameState,
   Home,
   HouseId,
+  IconName,
   Stage,
   Step,
 } from "./types.ts";
 
-// 금액 단위: 만 원. 원룸 관리비 8은 사용자 최종 확인 값.
-// 전세 가격은 빌라를 제외하고 기존 시안의 학습용 예시를 사용한다.
-export const homes: Home[] = [
+// 기존 Home 구조를 유지하면서 추가 설명을 보관한다.
+type HomeWithDetails = Home & {
+  managementFee: string;
+  hint: string;
+  inspect: string;
+};
+
+// 현재 types.ts에는 Inspection이 없으므로 이 파일에서 정의한다.
+type Inspection = "window" | "sink" | "door";
+
+// 1차 분기: 계약 형태별 튜토리얼 팁
+export const contractTutorials: Record<
+  Contract,
+  {
+    title: string;
+    subtitle: string;
+    tips: string[];
+  }
+> = {
+  monthly: {
+    title: "월세 계약의 핵심",
+    subtitle: "보증금 500~2,000만 원 + 월세 + 관리비",
+    tips: [
+      "보증금 1,000만 원을 올리면 월세가 4~5만 원 내려가는 게 보통이다. 이 비율보다 불리하면 협상 여지가 있다.",
+      "월세 45만 원짜리 방의 실제 지출은 45만 원이 아니다. 관리비 + 가스 + 전기 + 수도 + 인터넷을 합쳐서 비교해야 한다.",
+      "보증금 500만 원도 소중한 내 돈이다. 금액이 작아도 집주인과 권리관계를 확인하는 절차는 생략하지 않는다.",
+    ],
+  },
+  jeonse: {
+    title: "전세 + 대출 계약의 핵심",
+    subtitle: "목돈 보증금 마련과 안전한 반환 따져보기",
+    tips: [
+      "‘전세보증금 ÷ 매매 시세 × 100’로 전세가율을 계산할 수 있고 이를 통해 깡통전세 위험성을 알 수 있다.",
+      "반환보증 가입이 안 된다면 계약을 서두르지 않고 거절 사유를 꼭 확인한다. 신청 시기나 서류 등도 가입에 영향을 준다.",
+      "전세 계약은 대출 이자를 감당할 수 있는지와 만기 시 보증금을 안전하게 돌려받을 수 있는지를 최우선으로 고려해야 한다.",
+    ],
+  },
+};
+
+// 2차 분기: 주택 유형
+// 금액 단위: 만 원.
+// deposit은 월세 보증금, jeonse는 전세보증금이다.
+// 전세 조건은 기존 시나리오와 일치하도록 유지한다.
+export const homes: HomeWithDetails[] = [
   {
     id: "oneroom",
     name: "원룸",
@@ -27,13 +69,16 @@ export const homes: Home[] = [
     deposit: 1000,
     rent: 55,
     maintenance: 8,
+    managementFee: "관리비 8만원",
     jeonse: 8000,
     turningPoint: "내 방보다 먼저 들어온 보증금은 얼마일까?",
+    hint: "단독주택으로 분류되어 건물 전체의 선순위 보증금 총액을 꼭 확인해야 합니다.",
+    inspect: "창틀 아래에 물이 흘렀던 자국이 희미하게 남아 있다.",
   },
   {
     id: "officetel",
     name: "오피스텔",
-    sub: "도심의 작은 공간",
+    sub: "주거용 공간",
     icon: "building",
     description:
       "한 공간에 방과 주방·욕실을 갖추고, 건물의 공용시설을 함께 이용한다.",
@@ -41,8 +86,11 @@ export const homes: Home[] = [
     deposit: 1000,
     rent: 65,
     maintenance: 12,
+    managementFee: "관리비 12만원",
     jeonse: 12000,
     turningPoint: "월세를 깎아주는 대신 전입신고를 못 한다면?",
+    hint: "편리한 공용 시설만큼 일반 주택보다 관리비 단위가 높을 수 있습니다.",
+    inspect: "창문은 조금만 열린다. 환기가 잘 되는지 직접 확인해 보고 싶다.",
   },
   {
     id: "villa",
@@ -54,52 +102,69 @@ export const homes: Home[] = [
     deposit: 1000,
     rent: 55,
     maintenance: 5,
+    managementFee: "관리비 5만원",
     jeonse: 15000,
     turningPoint: "거래 이력이 없는 새집의 가격을 믿어도 될까?",
+    hint: "호수별로 개별 등기가 되어 있어 호수 일치 여부를 서류에서 필히 확인해야 합니다.",
+    inspect: "창틀 모서리 벽지에 얼룩이 보인다. 언제 생겼는지 물어봐야겠다.",
   },
   {
     id: "rooftop",
     name: "옥탑방",
-    sub: "옥상 위의 방",
+    sub: "건물 맨 위",
     icon: "roof",
     description: "건물 맨 위, 옥상에 자리한 방에서 산다.",
     area: "18㎡ · 옥상층",
     deposit: 500,
     rent: 45,
     maintenance: 5,
+    managementFee: "관리비 5만원",
     jeonse: 5000,
     turningPoint: "계약서에 내 방의 정확한 주소가 없다면?",
+    hint: "건축물대장에 등재되지 않은 무허가 옥탑 증축인지 사전 조회가 필수입니다.",
+    inspect:
+      "창가에 서자 지붕 쪽에서 열기가 느껴진다. 단열 상태도 물어봐야겠다.",
   },
   {
     id: "basement",
     name: "반지하",
-    sub: "낮은 창이 있는 집",
+    sub: "지면 아래",
     icon: "stairs",
     description: "방의 일부가 지면 아래에 있는 공간에서 산다.",
     area: "23㎡ · 반지하",
     deposit: 500,
     rent: 40,
     maintenance: 5,
+    managementFee: "관리비 5만원",
     jeonse: 5500,
     turningPoint: "새 벽지 아래에 침수 흔적이 남아 있다면?",
+    hint: "폭우 시 역류 위험과 습기·환기 상태를 현장에서 중점 체크해야 합니다.",
+    inspect: "창문 바깥 바닥이 방보다 높다. 비가 많이 오면 물이 어디로 흐를까?",
   },
   {
     id: "goshiwon",
     name: "고시원",
-    sub: "함께 쓰는 생활 공간",
+    sub: "쉐어/개인실",
     icon: "people",
     description: "작은 개인실에서 지내며 주방 등 일부 시설을 함께 쓴다.",
     area: "10㎡ · 3층",
     deposit: 10,
     rent: 38,
     maintenance: 0,
+    managementFee: "관리비 없음",
     jeonse: null,
     turningPoint: "내 계약 상대가 건물주가 아닌 운영업체라면?",
+    hint: "임대차보호법 적용 여부와 전입신고 가능 여부를 먼저 점검해야 합니다.",
+    inspect: "창가 너머 복도 소음이 들린다. 방음 수준을 확인해 보자.",
   },
 ];
-export const money = (value: number) => value.toLocaleString("ko-KR") + "만 원";
+
+export const money = (value: number) =>
+  value.toLocaleString("ko-KR") + "만 원";
+
 export const contractLabel = (contract: Contract) =>
   contract === "monthly" ? "월세" : "전세 + 대출";
+
 export const priceLabel = (home: Home, contract: Contract) =>
   contract === "monthly"
     ? "보증금 " +
@@ -114,18 +179,84 @@ export const priceLabel = (home: Home, contract: Contract) =>
       money(home.maintenance) +
       " · 대출이자 별도";
 
+// 기존 ChooseView에서 사용하는 tutorials도 같은 내용을 참조한다.
 export const tutorials: Record<Contract, string[]> = {
-  monthly: [
-    "보증금 1,000만 원을 올리면 월세가 4~5만 원 내려가는 게 보통이다. 이 비율보다 불리하면 협상 여지가 있다.",
-    "월세 45만 원짜리 방의 실제 지출은 45만 원이 아니다. 관리비 + 가스 + 전기 + 수도 + 인터넷을 합쳐서 비교해야 한다.",
-    "보증금 500만 원도 소중한 내 돈이다. 금액이 작아도 집주인과 권리관계를 확인하는 절차는 생략하지 않는다.",
-  ],
-  jeonse: [
-    "‘전세보증금 ÷ 매매 시세 × 100’로 전세가율을 계산할 수 있고 이를 통해 위험성을 알 수 있다.",
-    "반환보증 가입이 안 된다면 계약을 서두르지 않고 거절 사유를 꼭 확인한다. 신청 시기나 서류 등도 가입에 영향을 줄 수 있다.",
-    "전세 계약은 대출로 인해 생기는 이자를 감당할 수 있는지와 계약이 끝나고 보증금을 안전하게 돌려받을 수 있는지의 여부를 중요하게 고려해야 한다.",
-  ],
+  monthly: contractTutorials.monthly.tips,
+  jeonse: contractTutorials.jeonse.tips,
 };
+
+// 추가 임장 설명 데이터.
+// 기존 시나리오의 commonInspections와 inspectionItems는 그대로 유지한다.
+export const inspections: Record<
+  Inspection,
+  {
+    title: string;
+    icon: IconName;
+    narrative: (home: Home) => string;
+    learning: string;
+    note: string;
+  }
+> = {
+  window: {
+    title: "창문 주변",
+    icon: "window",
+    narrative: (home) =>
+      homes.find((item) => item.id === home.id)?.inspect ?? home.description,
+    learning:
+      "흔적이 보인다면 언제 생겼는지, 어떻게 보수했는지 물어보고 사진으로 남겨 두자.",
+    note: "창문 주변의 상태를 기록했다. 원인과 보수 이력을 중개사에게 물어볼 예정.",
+  },
+  sink: {
+    title: "싱크대",
+    icon: "water",
+    narrative: () =>
+      "수도꼭지를 틀어 본다. 물줄기는 일정하고 배수도 원활하다.",
+    learning: "수압뿐만 아니라 온수와 배수 속도도 직접 확인해 보자.",
+    note: "수압과 배수 상태를 확인했다. 이번 방문에서는 이상을 발견하지 못했다.",
+  },
+  door: {
+    title: "현관과 도어락",
+    icon: "door",
+    narrative: () =>
+      "문을 닫고 손잡이를 당겨 본다. 잠금장치가 견고하게 작동한다.",
+    learning: "도어락 작동 여부와 문을 닫았을 때 외부 소음 차단력을 점검하자.",
+    note: "현관 도어락 잠금 상태와 복도 소음 차폐를 확인했다.",
+  },
+};
+
+export const talkItems = [
+  {
+    id: "cost",
+    label: "“관리비에는 어떤 항목이 포함되나요?”",
+    title: "매달 나가는 비용",
+    reply: (contract: Contract) =>
+      contract === "monthly"
+        ? "“관리비는 공용 청소와 인터넷 포함이며, 수도/가스/전기는 별도 고지서로 나와요.”"
+        : "“관리비는 항목별로 정산되며, 대출 승인 여부는 서류를 지참해 은행에 확인하셔야 합니다.”",
+    note: (contract: Contract) =>
+      contract === "monthly"
+        ? "관리비 실비 항목(가스, 전기, 수도 별도 여부) 명확히 정리 필요."
+        : "대출 가능 여부는 은행 서류 심사 전까지 확답 불가. 사전 확인 필수.",
+  },
+  {
+    id: "condition",
+    label: "“보수 흔적이 보이는데 언제 수리하셨나요?”",
+    title: "확답을 받지 못한 보수 이력",
+    reply: () =>
+      "“임대인분께 최근 수리 내역과 보수 영수증 증빙이 있는지 확인해 드릴게요.”",
+    note: () =>
+      "하자 발생 시 임대인 수리 의무 조항을 특약에 넣을 수 있는지 검토.",
+  },
+  {
+    id: "papers",
+    label: "“계약 전 등기사항증명서와 계좌를 먼저 확인하고 싶어요.”",
+    title: "서류 및 계좌 확인 요청",
+    reply: () =>
+      "“등기부등본 열람본과 계약금 입금 계좌 정보를 준비해 두었습니다.”",
+    note: () => "등기부 소유자와 입금 계좌의 예금주 일치 여부 필수 확인.",
+  },
+];
+
 export const sources = {
   law: "https://www.easylaw.go.kr/CSP/CnpClsMainBtr.laf?csmSeq=629&ccfNo=2&cciNo=3&cnpClsNo=1",
   guarantee: "https://m.khug.or.kr/hug/web/ig/dr/igdr000001.jsp?tabMenu=Y",

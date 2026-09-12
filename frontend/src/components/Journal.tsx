@@ -1,4 +1,9 @@
-import { useState, useSyncExternalStore, type ReactNode } from "react";
+import {
+  useEffect,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 import housingAppImage from "../assets/housing-app.png";
 import listingInquiryImage from "../assets/listing-inquiry.png";
 import brokerMessageImage from "../assets/broker-message.png";
@@ -7,10 +12,8 @@ import type { Background } from "../types";
 import { Icon } from "./Icon";
 import { ScenePopup } from "./StoryModal";
 
-const backgrounds: Record<
-  Background,
-  { description: string; specified: boolean; src?: string }
-> = {
+type ScenePhoto = { description: string; specified: boolean; src?: string };
+const backgrounds: Record<Background, ScenePhoto> = {
   home: {
     description: "부동산 앱을 보고 있는 사진",
     specified: true,
@@ -45,6 +48,93 @@ const backgrounds: Record<
     specified: false,
   },
 };
+
+// 디코딩한 이미지를 보관해 장면이 바뀌어도 다시 준비하는 빈 프레임이 생기지 않게 한다.
+const sceneImages = new Map<
+  string,
+  {
+    image: HTMLImageElement;
+    ready: Promise<void>;
+    decoded: boolean;
+  }
+>();
+function prepareSceneImage(src: string) {
+  const cached = sceneImages.get(src);
+  if (cached) return cached.ready;
+  const image = new Image();
+  image.src = src;
+  const entry = {
+    image,
+    decoded: false,
+    ready: image
+      .decode()
+      .then(() => {
+        entry.decoded = true;
+      })
+      .catch((error: unknown) => {
+        sceneImages.delete(src);
+        throw error;
+      }),
+  };
+  sceneImages.set(src, entry);
+  return entry.ready;
+}
+
+export function SceneImagePreloader() {
+  useEffect(() => {
+    for (const photo of Object.values(backgrounds)) {
+      if (photo.src)
+        void prepareSceneImage(photo.src).catch(() => {
+          // 해당 장면에서 다시 시도하고, 실패하면 기존 사진 안내를 표시한다.
+        });
+    }
+  }, []);
+  return null;
+}
+
+function SceneBackground({ photo }: { photo: ScenePhoto }) {
+  const [readyPhoto, setReadyPhoto] = useState<ScenePhoto>(() =>
+    photo.src && !sceneImages.get(photo.src)?.decoded
+      ? { ...photo, src: undefined }
+      : photo,
+  );
+  useEffect(() => {
+    if (!photo.src) return;
+    let cancelled = false;
+    void prepareSceneImage(photo.src)
+      .then(() => {
+        if (!cancelled) setReadyPhoto(photo);
+      })
+      .catch(() => {
+        if (!cancelled) setReadyPhoto({ ...photo, src: undefined });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [photo]);
+  // 다음 이미지가 준비될 때까지 현재 이미지를 그대로 둔다.
+  const visiblePhoto =
+    !photo.src || sceneImages.get(photo.src)?.decoded ? photo : readyPhoto;
+  return visiblePhoto.src ? (
+    <img
+      className="scene-image"
+      src={visiblePhoto.src}
+      alt={visiblePhoto.description}
+      decoding="sync"
+      draggable={false}
+    />
+  ) : (
+    <div
+      className="background-placeholder"
+      role="img"
+      aria-label={visiblePhoto.description}
+    >
+      <Icon name="window" />
+      <span>{visiblePhoto.specified ? "시나리오 이미지" : "이미지 제안"}</span>
+      <p>{visiblePhoto.description}</p>
+    </div>
+  );
+}
 
 const compactSceneQuery = "(max-width: 1100px)";
 function subscribeToCompactScene(onChange: () => void) {
@@ -158,26 +248,7 @@ export function SceneFrame({
     >
       <div className={"scene-visual " + (scene ? "has-content" : "")}>
         <div className="scene-base" inert={blocked}>
-          {photo.src ? (
-            <img
-              key={photo.src}
-              className="scene-image"
-              src={photo.src}
-              alt={photo.description}
-              decoding="async"
-              draggable={false}
-            />
-          ) : (
-            <div
-              className="background-placeholder"
-              role="img"
-              aria-label={photo.description}
-            >
-              <Icon name="window" />
-              <span>{photo.specified ? "시나리오 이미지" : "이미지 제안"}</span>
-              <p>{photo.description}</p>
-            </div>
-          )}
+          <SceneBackground photo={photo} />
           <div className="scene-content">{scene}</div>
           {compact && (
             <button

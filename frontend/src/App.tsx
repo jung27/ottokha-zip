@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { OnboardingModal } from "./components/OnboardingModal";
 import { Header } from "./components/Header";
+import { SceneImagePreloader } from "./components/Journal";
 import { AppModals } from "./components/modals/AppModals";
 import {
   parseRecommendation,
@@ -39,6 +40,7 @@ export default function App() {
     }
   });
   const [showHome, setShowHome] = useState(false);
+  const [replayVersion, setReplayVersion] = useState(0);
   const [theme, setTheme] = useState<"light" | "dark">(() => {
     try {
       return localStorage.getItem(THEME_KEY) === "dark" ? "dark" : "light";
@@ -205,6 +207,7 @@ export default function App() {
   }
   function replay(stepId: string) {
     setGame((previous) => rewindGame(previous, stepId));
+    setReplayVersion((version) => version + 1);
     setShowHome(false);
     setModal(null);
   }
@@ -330,6 +333,7 @@ export default function App() {
 
   return (
     <div className="app-shell">
+      <SceneImagePreloader />
       <Header
         onHome={() => setShowHome(true)}
         onGuide={() => setShowOnboarding(true)}
@@ -390,10 +394,7 @@ export default function App() {
         ) : (
           <>
             <div className="play-layout">
-              <div
-                className="play-main"
-                key={step.id + ":" + (answered ? "answered" : "pending")}
-              >
+              <div className="play-main" key={step.id + ":" + replayVersion}>
                 {step.kind === "inspection" ? (
                   <ExploreView {...playProps} />
                 ) : step.kind === "checklist" ||
