@@ -63,6 +63,28 @@ const HOUSE_LABELS: Record<string, string> = {
   goshiwon: "고시원",
 };
 
+// 공유 데이터 파싱 헬퍼 함수
+function parseSharePayload(rawQuery: unknown) {
+  const defaultData = { c: "monthly", h: "oneroom", r: 0 };
+  if (typeof rawQuery !== "string" || !rawQuery) return defaultData;
+
+  try {
+    // 쿼리스트링 전달 시 '+' 기호가 공백(' ')으로 변환되는 현상 복원
+    const base64 = rawQuery.replace(/ /g, "+");
+    const rawString = Buffer.from(base64, "base64").toString("utf-8");
+
+    // 클라이언트 인코딩 방식(URI 인코딩 여부)에 따른 안전한 디코딩 분기
+    const jsonString = rawString.includes("%")
+      ? decodeURIComponent(rawString)
+      : rawString;
+
+    return JSON.parse(jsonString);
+  } catch (err) {
+    console.error("Failed to parse share data:", err);
+    return defaultData;
+  }
+}
+
 // 1. SNS 크롤러용 HTML 메타태그 제공 및 브라우저 리다이렉트
 app.get("/api/share", (req: Request, res: Response) => {
   const encodedData = req.query.d as string;
@@ -70,14 +92,7 @@ app.get("/api/share", (req: Request, res: Response) => {
     return res.redirect("/");
   }
 
-  let parsed = { c: "monthly", h: "oneroom", r: 0 };
-  try {
-    parsed = JSON.parse(
-      decodeURIComponent(Buffer.from(encodedData, "base64").toString("utf-8")),
-    );
-  } catch (e) {
-    console.error("Failed to parse share data:", e);
-  }
+  const parsed = parseSharePayload(encodedData);
 
   const houseName = HOUSE_LABELS[parsed.h] || "첫 집";
   const contractType = parsed.c === "monthly" ? "월세" : "전세";
@@ -116,20 +131,7 @@ app.get("/api/share", (req: Request, res: Response) => {
 
 // 2. 동적 성적표 카드 이미지(PNG) 실시간 렌더링
 app.get("/api/og", (req: Request, res: Response) => {
-  const encodedData = req.query.d as string;
-  let parsed = { c: "monthly", h: "oneroom", r: 0 };
-
-  if (encodedData) {
-    try {
-      parsed = JSON.parse(
-        decodeURIComponent(
-          Buffer.from(encodedData, "base64").toString("utf-8"),
-        ),
-      );
-    } catch (e) {
-      console.error("Failed to decode OG data:", e);
-    }
-  }
+  const parsed = parseSharePayload(req.query.d);
 
   const width = 1200;
   const height = 630;

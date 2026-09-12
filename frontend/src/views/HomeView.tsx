@@ -206,8 +206,16 @@ export function HomeView({
       t: Date.now(),
     };
 
-    const encoded = btoa(encodeURIComponent(JSON.stringify(payload)));
-    const shareUrl = `${API_BASE_URL}/api/share?d=${encodeURIComponent(encoded)}`;
+    // 브라우저에서 UTF-8 문자열을 안전하게 Base64로 변환
+    const jsonString = JSON.stringify(payload);
+    const base64Data = btoa(
+      encodeURIComponent(jsonString).replace(/%([0-9A-F]{2})/g, (_, p1) =>
+        String.fromCharCode(parseInt(p1, 16)),
+      ),
+    );
+
+    // URL 쿼리에 들어갈 수 있도록 encodeURIComponent 적용
+    const shareUrl = `${API_BASE_URL}/api/share?d=${encodeURIComponent(base64Data)}`;
 
     if (navigator.share) {
       try {
@@ -218,7 +226,7 @@ export function HomeView({
         });
         return;
       } catch {
-        /* 사용자가 시스템 공유창을 닫거나 취소한 경우 */
+        /* 사용자 취소 */
       }
     }
 
