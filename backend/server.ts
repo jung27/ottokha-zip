@@ -10,6 +10,12 @@ console.log(
   process.env.GEMINI_API_KEY ? "EXISTS" : "UNDEFINED",
 );
 
+// 프론트엔드 실제 접속 주소 (로컬 Vite 기본값: http://localhost:5173)
+const CLIENT_URL = (process.env.CLIENT_URL || "http://localhost:5173").replace(
+  /\/$/,
+  "",
+);
+
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 async function processText(text: string) {
@@ -85,11 +91,11 @@ function parseSharePayload(rawQuery: unknown) {
   }
 }
 
-// 1. SNS 크롤러용 HTML 메타태그 제공 및 브라우저 리다이렉트
+// 1. SNS 크롤러용 HTML 메타태그 제공 및 프론트엔드로 브라우저 리다이렉트
 app.get("/api/share", (req: Request, res: Response) => {
   const encodedData = req.query.d as string;
   if (!encodedData) {
-    return res.redirect("/");
+    return res.redirect(CLIENT_URL);
   }
 
   const parsed = parseSharePayload(encodedData);
@@ -104,9 +110,9 @@ app.get("/api/share", (req: Request, res: Response) => {
   const protocol = req.headers["x-forwarded-proto"] || req.protocol;
   const host = req.get("host");
   const ogImageUrl = `${protocol}://${host}/api/og?d=${encodeURIComponent(encodedData)}`;
-  const clientOrigin = req.headers.referer
-    ? new URL(req.headers.referer).origin
-    : `${protocol}://${host}`;
+
+  // 백엔드가 아닌 프론트엔드 라우트(#ending)로 이동
+  const targetAppUrl = `${CLIENT_URL}/#ending`;
 
   res.send(`<!DOCTYPE html>
 <html lang="ko">
@@ -121,10 +127,13 @@ app.get("/api/share", (req: Request, res: Response) => {
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="${title}" />
   <meta name="twitter:image" content="${ogImageUrl}" />
-  <meta http-equiv="refresh" content="0; url=${clientOrigin}/#ending" />
+  <meta http-equiv="refresh" content="0; url=${targetAppUrl}" />
 </head>
 <body style="font-family: sans-serif; background: #11191f; color: #fff; text-align: center; padding-top: 100px;">
   <p>결과 화면으로 이동 중입니다...</p>
+  <script>
+    window.location.replace("${targetAppUrl}");
+  </script>
 </body>
 </html>`);
 });
