@@ -1,11 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "../components/Icon";
 import { isRiskCheckpoint } from "../data";
-import { STAGES, type Checkpoint, type Ending, type Stage } from "../types";
+import {
+  STAGES,
+  type Checkpoint,
+  type Ending,
+  type GameState,
+  type Stage,
+} from "../types";
 
-const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL || "http://localhost"
-).replace(/\/$/, "");
+const API_BASE_URL = "http://localhost";
 
 const promptSuggestions = [
   "첫 취업으로 보증금 500에 월세 구하고 있어",
@@ -30,7 +34,11 @@ function ReviewCards({ notes }: { notes: Checkpoint[] }) {
               className={`rounded-md bg-accent-soft px-2 py-[5px] text-[0.65rem] font-semibold whitespace-nowrap text-accent
               group-data-[status=risk]/review:bg-risk-bg group-data-[status=risk]/review:text-risk`}
             >
-              {note.category === "notice" ? "안내" : note.status === "risk" ? "다시 확인" : "확인함"}
+              {note.category === "notice"
+                ? "안내"
+                : note.status === "risk"
+                  ? "다시 확인"
+                  : "확인함"}
             </span>
             <p>{note.choice}</p>
           </div>
@@ -45,7 +53,11 @@ function ReviewCards({ notes }: { notes: Checkpoint[] }) {
             <div className="mt-4 rounded-lg border border-line bg-soft p-4 text-xs leading-relaxed">
               <h4 className="mb-2 font-semibold">{note.explanation.title}</h4>
               <p className="whitespace-pre-line">{note.explanation.text}</p>
-              {note.explanation.advice && <p className="mt-2 whitespace-pre-line">{note.explanation.advice}</p>}
+              {note.explanation.advice && (
+                <p className="mt-2 whitespace-pre-line">
+                  {note.explanation.advice}
+                </p>
+              )}
             </div>
           )}
         </article>
@@ -56,6 +68,7 @@ function ReviewCards({ notes }: { notes: Checkpoint[] }) {
 
 export function HomeView({
   started,
+  game,
   onStartNew,
   onChooseConditions,
   onResume,
@@ -67,6 +80,7 @@ export function HomeView({
   onAppendix,
 }: {
   started: boolean;
+  game?: GameState;
   onStartNew: () => void;
   onChooseConditions: () => void;
   onResume: () => void;
@@ -88,6 +102,9 @@ export function HomeView({
   const [summaryError, setSummaryError] = useState("");
   const [showSummaryModal, setShowSummaryModal] = useState(false);
 
+  // 공유 알림 토스트 상태
+  const [shareNotice, setShareNotice] = useState("");
+
   const request = useRef<AbortController | null>(null);
   const summaryRequest = useRef<AbortController | null>(null);
 
@@ -97,6 +114,12 @@ export function HomeView({
       summaryRequest.current?.abort();
     };
   }, []);
+
+  useEffect(() => {
+    if (!shareNotice) return;
+    const timer = window.setTimeout(() => setShareNotice(""), 3000);
+    return () => window.clearTimeout(timer);
+  }, [shareNotice]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -122,7 +145,7 @@ export function HomeView({
   // 위험 선택지 요약 요청 핸들러
   async function handleSummarizeRisks() {
     setShowSummaryModal(true);
-    if (summary) return; // 이미 요약된 내용이 있으면 재요청 생략
+    if (summary) return;
 
     const riskNotes = notes.filter(isRiskCheckpoint);
     if (riskNotes.length === 0) {
@@ -171,6 +194,40 @@ export function HomeView({
     }
   }
 
+  // 결과 카드 공유 링크 생성 및 공유 핸들러
+  async function handleShareResult() {
+    const totalRiskCount = notes.filter(isRiskCheckpoint).length;
+    const payload = {
+      c: game?.contract ?? "monthly",
+      h: game?.house ?? "oneroom",
+      r: totalRiskCount,
+      t: Date.now(),
+    };
+
+    const encoded = btoa(encodeURIComponent(JSON.stringify(payload)));
+    const shareUrl = `${API_BASE_URL}/api/share?d=${encodeURIComponent(encoded)}`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: "어떡하집? 나의 첫 계약 결과",
+          text: `[어떡하집?] 내 계약 위험 요소 ${totalRiskCount}건 발견! 결과 카드를 확인해보세요.`,
+          url: shareUrl,
+        });
+        return;
+      } catch {
+        /* 사용자가 시스템 공유창을 닫거나 취소한 경우 */
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setShareNotice("결과 공유 링크가 클립보드에 복사되었습니다!");
+    } catch {
+      setShareNotice("링크 복사에 실패했습니다. 주소창을 확인해주세요.");
+    }
+  }
+
   if (ending) {
     const stageNotes = notes.filter((note) => note.stage === stage);
     const totalRiskCount = notes.filter(isRiskCheckpoint).length;
@@ -184,6 +241,18 @@ export function HomeView({
           <h1>이번 계약을 돌아보며</h1>
           <p>{ending.text}</p>
         </div>
+
+        {/* 공유 알림 토스트 */}
+        {shareNotice && (
+          <div className="mb-4 flex justify-center">
+            <p
+              className="rounded-full bg-accent px-4 py-2 text-[0.78rem] font-semibold text-white shadow-lg"
+              role="status"
+            >
+              {shareNotice}
+            </p>
+          </div>
+        )}
 
         {/* 주의해야 할 점 요약 버튼 배너 */}
         <div className="mb-8 flex justify-center">
@@ -279,6 +348,20 @@ export function HomeView({
           >
             다른 조합 해보기
           </button>
+
+          {/* 결과 카드 공유 버튼 */}
+          <button
+            className={`inline-flex min-h-[42px] items-center justify-center gap-[9px] rounded-[10px] px-[18px] py-[11px]
+            text-[0.79rem] font-[650] leading-[1.45] whitespace-normal transition-[background,border-color]
+            duration-150 ease-[ease] [&_svg]:size-4 [&_svg]:shrink-0 max-[600px]:min-h-10 max-[600px]:px-3.5
+            max-[600px]:py-2.5 max-[600px]:text-[0.74rem] border border-line bg-surface text-ink
+            enabled:hover:border-accent enabled:hover:bg-accent-soft`}
+            onClick={handleShareResult}
+          >
+            <Icon name="spark" />
+            결과 카드 공유
+          </button>
+
           <button
             className={`inline-flex min-h-[42px] items-center justify-center gap-[9px] rounded-[10px] px-[18px] py-[11px]
             text-[0.79rem] font-[650] leading-[1.45] whitespace-normal transition-[background,border-color]
