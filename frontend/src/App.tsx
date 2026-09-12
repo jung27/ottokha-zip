@@ -463,11 +463,11 @@ const chapterCards: {
   },
 ];
 
-const documentTabs: { id: DocumentTab; label: string }[] = [
-  { id: "address", label: "표제부 · 집의 정보" },
-  { id: "owner", label: "갑구 · 소유자" },
-  { id: "rights", label: "을구 · 권리관계" },
-];
+// const documentTabs: { id: DocumentTab; label: string }[] = [
+//   { id: "address", label: "표제부 · 집의 정보" },
+//   { id: "owner", label: "갑구 · 소유자" },
+//   { id: "rights", label: "을구 · 권리관계" },
+// ];
 
 const sourceUrl =
   "https://www.molit.go.kr/portal/common/download/DownloadMltm2.jsp?FileName=%EC%A0%84%EC%84%B8%EA%B3%84%EC%95%BD+%EC%9C%A0%EC%9D%98%EC%82%AC%ED%95%AD+%EB%A6%AC%ED%94%8C%EB%A0%9B.pdf&FilePath=portal%2FDextUpload%2F202301%2F20230113_090421_309.pdf";
