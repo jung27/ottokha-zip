@@ -19,6 +19,7 @@ import { DocumentView } from "./views/DocumentView";
 import { ExploreView } from "./views/ExploreView";
 import { HomeView } from "./views/HomeView";
 import { TalkView } from "./views/TalkView";
+import { OnboardingModal } from "./components/OnboardingModal";
 
 // 실제 서버 API 기본 주소 (필요에 따라 변경)
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost";
@@ -90,6 +91,7 @@ export default function App() {
   const [dialogue, setDialogue] = useState<number | null>(null);
   const [modal, setModal] = useState<ModalKind>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [showOnboarding, setShowOnboarding] = useState(false); // 수동 다시보기용 (선택사항)
   const appRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -252,7 +254,22 @@ export default function App() {
       ref={appRef}
       className="min-h-screen bg-[#11191f] text-[#f0f3f2] flex flex-col"
     >
-      <Header onNavigate={navigate} onOpenModal={setModal} />
+      {/* 첫 방문 시 자동으로 슬라이드 팝업 실행 */}
+      <OnboardingModal
+        forceOpen={showOnboarding}
+        onFinish={() => setShowOnboarding(false)}
+      />
+
+      <Header
+        onNavigate={navigate}
+        onOpenModal={(kind) => {
+          if (kind === "guide") {
+            setShowOnboarding(true); // 헤더의 ? 아이콘을 눌렀을 때 온보딩을 다시 보게 해도 좋습니다.
+          } else {
+            setModal(kind);
+          }
+        }}
+      />
 
       <main
         tabIndex={-1}
