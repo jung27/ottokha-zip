@@ -1,4 +1,4 @@
-import type { Home, Inspection, Contract, IconName, Scene } from "./types";
+import type { Home, Inspection, Contract, IconName } from "./types";
 
 // 1차 분기: 계약 형태별 튜토리얼 팁
 export const contractTutorials: Record<
