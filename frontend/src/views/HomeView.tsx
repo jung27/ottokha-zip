@@ -9,7 +9,9 @@ import {
   type Stage,
 } from "../types";
 
-const API_BASE_URL = "http://localhost";
+const API_BASE_URL = (
+  import.meta.env.VITE_API_BASE_URL || "http://localhost"
+).replace(/\/$/, "");
 
 const promptSuggestions = [
   "첫 취업으로 보증금 500에 월세 구하고 있어",
