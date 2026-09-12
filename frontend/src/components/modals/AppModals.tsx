@@ -51,23 +51,45 @@ export function AppModals({
       onClose={onClose}
     >
       {modal === "new" || choosingConditions ? (
-        <div className="modal-content">
+        <div className="[&_p]:text-[0.84rem]">
           <p>
             {choosingConditions
               ? "지금까지의 선택을 지우고 계약 방식과 집을 다시 고릅니다."
               : "지금까지의 선택을 지우고 새로운 이야기를 시작합니다."}
           </p>
-          <div className="dialogue-actions">
-            <button className="text-button" onClick={onClose}>
+          <div
+            className="mt-3 flex shrink-0 flex-wrap items-center justify-end gap-2.5 empty:mt-0 max-[600px]:mt-2.5"
+            data-dialogue-actions
+          >
+            <button
+              className={`inline-flex min-h-[42px] items-center justify-center gap-[9px] rounded-[10px] px-1.5 py-[11px]
+              text-[0.79rem] font-[650] leading-[1.45] whitespace-normal transition-[background,border-color]
+              duration-150 ease-[ease] [&_svg]:size-4 [&_svg]:shrink-0 max-[600px]:min-h-10 max-[600px]:px-3.5
+              max-[600px]:py-2.5 max-[600px]:text-[0.74rem] text-muted hover:text-accent`}
+              onClick={onClose}
+            >
               돌아가기
             </button>
-            <button className="primary-button" onClick={onStartNew}>
+            <button
+              className={`inline-flex min-h-[42px] items-center justify-center gap-[9px] rounded-[10px] px-[18px] py-[11px]
+              text-[0.79rem] font-[650] leading-[1.45] whitespace-normal transition-[background,border-color]
+              duration-150 ease-[ease] [&_svg]:size-4 [&_svg]:shrink-0 max-[600px]:min-h-10 max-[600px]:px-3.5
+              max-[600px]:py-2.5 max-[600px]:text-[0.74rem] border border-mint bg-mint text-[#173d29]
+              enabled:hover:border-[#b1dbbf] enabled:hover:bg-[#b1dbbf]`}
+              data-button="primary"
+              onClick={onStartNew}
+            >
               {choosingConditions ? "조건 선택하기" : "처음부터 시작"}
             </button>
           </div>
         </div>
       ) : (
-        <div className="appendix">
+        <div
+          className={`[&_h3]:mt-5 [&_h3]:mb-2.5 [&_a]:flex [&_a]:items-center [&_a]:justify-between [&_a]:gap-3.5 [&_a]:border-b
+          [&_a]:border-line [&_a]:py-[13px] [&_a]:text-[0.8rem] [&_a]:no-underline [&_a:hover]:text-accent
+          [&_a_svg]:size-[15px] [&_a_svg]:shrink-0 [&_small]:mt-[5px] [&_small]:block [&_small]:text-[0.7rem]
+          [&_small]:leading-[1.8] [&_small]:text-muted`}
+        >
           <h3>필수 서류</h3>
           {links.map((link) => (
             <a key={link.name} href={link.url} target="_blank" rel="noreferrer">

@@ -1372,7 +1372,7 @@ export function getSteps(g: GameState): Step[] {
             undefined,
             "app",
           ),
-          beat("매물에 문의하자 답장이 온다.", undefined, "listing"),
+          beat("매물에 문의하자 답장이 온다.", undefined, "message"),
           beat(
             "오늘 두 팀 더 보러 오세요. 마음 있으시면 빨리 오셔야 해요.",
             "중개사 · 문자",
@@ -1380,10 +1380,13 @@ export function getSteps(g: GameState): Step[] {
           ),
           beat(
             "방문 약속을 잡고 부동산에 도착했다. 그런데 안내자가 다른 방 사진을 보여준다.",
+            undefined,
+            "office",
           ),
           beat(
             "보셨던 방은 방금 나갔어요. 대신 비슷한 방이 하나 있어요. 오신 김에 보고 가시죠.",
             "중개사",
+            "agent",
           ),
         ],
         [
@@ -1408,7 +1411,7 @@ export function getSteps(g: GameState): Step[] {
         home.name + " 매물 탐색",
         [beat(search.text)],
         housingChoices(search, ["skip", "trust", "ask", "later"]),
-        "listing",
+        g.house,
       ),
       explanation: search.warning,
     },
@@ -1420,10 +1423,12 @@ export function getSteps(g: GameState): Step[] {
       title: "집 보기",
       background: "room",
       beats: [
-        beat("방에 도착했다. 중개사가 문을 열어준다.", undefined, "agent"),
-        beat("편하게 보세요.", "중개사", "agent"),
+        beat("방에 도착했다. 중개사가 문을 열어준다.", undefined, "room-entry"),
+        beat("편하게 보세요.", "중개사", "room-entry"),
+        beat("방 안을 둘러본다. 어디부터 확인할까?", undefined, "room"),
       ],
       items: inspectionItems(g.house),
+      requireAll: true,
       notice: {
         title: "임장 팁",
         text: "같은 집을 시간대를 바꿔 두 번 본다. 낮에는 채광과 곰팡이, 밤에는 소음과 귀갓길. 비 온 다음 날 가면 누수와 습기를 가장 정확히 알 수 있다.",
@@ -1440,10 +1445,14 @@ export function getSteps(g: GameState): Step[] {
             g.house === "goshiwon"
               ? "지금 보증금 10만 원만 넣어두시면 다른 사람한테 안 넘어가요. 계좌 보내드릴게요."
               : "지금 100만 원만 넣어두시면 다른 사람한테 안 넘어가요. 계좌 보내드릴게요.",
-            "중개사",
-            "agent",
+            "중개사 · 문자",
+            g.house === "goshiwon" ? "agent" : "deposit-message",
           ),
-          beat("문자로 계좌번호가 왔다. 예금주: 김○○", undefined, "message"),
+          beat(
+            "문자로 계좌번호가 왔다. 예금주: 김○○",
+            undefined,
+            g.house === "goshiwon" ? "agent" : "deposit-message",
+          ),
         ],
         [
           bad(
@@ -1485,8 +1494,10 @@ export function getSteps(g: GameState): Step[] {
           [
             beat(
               "등기부상 소유자는 박○○. 그런데 문자로 온 계좌 예금주는 김○○이다.",
+              undefined,
+              "owner-account",
             ),
-            beat("중개사에게 물었다."),
+            beat("중개사에게 물었다.", undefined, "owner-account"),
             beat(
               "아드님이세요. 아버지가 편찮으셔서 관리를 맡고 계세요.",
               "중개사",
@@ -1555,7 +1566,7 @@ export function getSteps(g: GameState): Step[] {
         kind: "info",
         eyebrow: "",
         title: "등기부 확인",
-        background: "office",
+        background: "lease",
         beats,
         document: "registry",
       });
@@ -1573,8 +1584,8 @@ export function getSteps(g: GameState): Step[] {
       beats: [
         beat("부동산 사무실. A4 두 장짜리 계약서가 놓여 있다."),
         beat("특약사항 칸은 비어 있다."),
-        beat("중개사가 묻는다.", undefined, "agent"),
-        beat("넣으실 거 있으세요?", "중개사", "agent"),
+        beat("중개사가 묻는다."),
+        beat("넣으실 거 있으세요?", "중개사"),
       ],
       items: clauseItems(g.contract),
       document: "lease",
@@ -1593,7 +1604,7 @@ export function getSteps(g: GameState): Step[] {
       kind: "checklist",
       eyebrow: "",
       title: "서명 전 확인",
-      background: "lease",
+      background: "signing",
       beats: [beat("펜을 들었다. 서명하기 전에 확인할 수 있는 것이 있다.")],
       items: signingItems,
       document: "lease",
@@ -1604,11 +1615,11 @@ export function getSteps(g: GameState): Step[] {
         5,
         "계좌가 바뀌었다",
         [
-          beat("잔금을 보내려는 참에 문자가 온다."),
+          beat("잔금을 보내려는 참에 문자가 온다.", undefined, "moving"),
           beat(
             "사정이 있어서 계좌가 바뀌었어요. 아래로 보내주세요.",
             "중개사 · 문자",
-            "message",
+            "account-change",
           ),
           beat("예금주 이름이 계약서와 다르다."),
         ],
@@ -1622,7 +1633,7 @@ export function getSteps(g: GameState): Step[] {
           ),
           bad("text", "문자로 다시 한 번 계좌를 확인받고 보낸다", "account"),
         ],
-        "moving",
+        "account-change",
       ),
       explanation: warnings.account,
     },
@@ -1634,6 +1645,8 @@ export function getSteps(g: GameState): Step[] {
         [
           beat(
             "금요일, 잔금일이다. 이삿짐 트럭은 오후 2시에 왔고 짐 정리에 하루가 갈 것 같다.\n주민센터는 6시에 닫는다. 내일은 토요일, 월요일은 첫 출근이라 오전부터 일정이 잡혀 있다.",
+            undefined,
+            "moving",
           ),
           beat("현재 시각 오후 4시 50분."),
           beat("서류는 계약할 때 다 봤으니 잔금만 보내시면 된다.", "중개사"),
@@ -1660,7 +1673,7 @@ export function getSteps(g: GameState): Step[] {
             "timing",
           ),
         ],
-        "moving",
+        "balance-day",
       ),
       explanation: warnings.timing,
     },
@@ -1689,7 +1702,7 @@ export function getSteps(g: GameState): Step[] {
             "settlement",
           ),
         ],
-        "moving",
+        "settlement",
       ),
       explanation: warnings.settlement,
     },
@@ -1721,7 +1734,7 @@ export function getSteps(g: GameState): Step[] {
                 "guarantee",
               ),
             ],
-            "moving",
+            "insurance",
           ),
           explanation: warnings.guarantee,
         }
@@ -1748,7 +1761,7 @@ export function getSteps(g: GameState): Step[] {
               bad("self", "내 돈으로 고치고 나중에 청구한다", "defect"),
               bad("phone", "전화로만 이야기하고 넘어간다", "defect"),
             ],
-            "moving",
+            "defect",
           ),
           explanation: warnings.defect,
         },
@@ -1877,6 +1890,13 @@ export function rewindGame(g: GameState, stepId: string): GameState {
   };
 }
 
+export function hasRequiredItems(step: Step, selected: string[]): boolean {
+  return (
+    !step.requireAll ||
+    Boolean(step.items?.every((item) => selected.includes(item.id)))
+  );
+}
+
 export function restoreGame(raw: string | null): GameState {
   const fresh = makeNewGame();
   try {
@@ -1918,6 +1938,22 @@ export function restoreGame(raw: string | null): GameState {
       return fresh;
     const steps = getSteps(game);
     if (!steps.some((s) => s.id === game.cursor)) game.cursor = steps[0].id;
+    const inspection = steps.find((step) => step.id === "inspection")!;
+    // 예전의 5곳 제한으로 완료한 기록은 선택을 보존해 나머지를 확인하게 한다.
+    if (
+      game.answers.inspection &&
+      !hasRequiredItems(inspection, game.answers.inspection)
+    ) {
+      return {
+        ...game,
+        page: "play",
+        cursor: inspection.id,
+        answers: Object.fromEntries(
+          Object.entries(game.answers).filter(([id]) => id !== inspection.id),
+        ),
+        drafts: { ...game.drafts, inspection: game.answers.inspection },
+      };
+    }
     if (
       game.page === "ending" &&
       !movingItems.every((item) => game.answers.moving?.includes(item.id))

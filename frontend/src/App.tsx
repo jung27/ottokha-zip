@@ -8,6 +8,7 @@ import {
   getCheckpoints,
   getEnding,
   getSteps,
+  hasRequiredItems,
   makeNewGame,
   restoreGame,
   rewindGame,
@@ -182,7 +183,7 @@ export default function App() {
       )
         return;
       const button = appRef.current?.querySelectorAll<HTMLButtonElement>(
-        ".choices-container button",
+        "[data-choices] button",
       )[Number(e.key) - 1];
       if (button && !button.disabled) {
         e.preventDefault();
@@ -228,17 +229,6 @@ export default function App() {
     if (answered || !step.items?.some((item) => item.id === id)) return;
     setGame((previous) => {
       const current = previous.drafts[step.id] ?? [];
-      const item = step.items!.find((item) => item.id === id)!;
-      const commonCount = step.items!.filter(
-        (item) => !item.extra && current.includes(item.id),
-      ).length;
-      if (
-        step.kind === "inspection" &&
-        !item.extra &&
-        !current.includes(id) &&
-        commonCount >= 5
-      )
-        return previous;
       return {
         ...previous,
         drafts: {
@@ -251,11 +241,7 @@ export default function App() {
     });
   }
   function submit() {
-    if (
-      step.requireAll &&
-      !step.items?.every((item) => selected.includes(item.id))
-    )
-      return;
+    if (!hasRequiredItems(step, selected)) return;
     if (!answered)
       setGame((previous) => ({
         ...previous,
@@ -266,11 +252,7 @@ export default function App() {
       }));
   }
   function next() {
-    if (
-      step.requireAll &&
-      !step.items?.every((item) => selected.includes(item.id))
-    )
-      return;
+    if (!hasRequiredItems(step, selected)) return;
     if (step.kind !== "info" && step.kind !== "recap" && !answered) return;
     setGame((previous) => {
       const updated = {
@@ -332,7 +314,7 @@ export default function App() {
   };
 
   return (
-    <div className="app-shell">
+    <div className="min-h-svh">
       <SceneImagePreloader />
       <Header
         onHome={() => setShowHome(true)}
@@ -340,9 +322,17 @@ export default function App() {
         theme={theme}
         onToggleTheme={() => setTheme(theme === "light" ? "dark" : "light")}
       />
-      <main ref={appRef} tabIndex={-1} className="app-main">
+      <main
+        ref={appRef}
+        tabIndex={-1}
+        className={`mx-auto w-[min(1184px,100%)] px-7 pt-2.5 pb-[30px] outline-none has-[[data-scene]]:w-[min(1344px,100%)]
+        max-[800px]:px-5 max-[600px]:px-3 max-[600px]:pt-1.5 max-[600px]:pb-5`}
+      >
         {storageFailed && (
-          <div className="storage-notice" role="status">
+          <div
+            className="mb-2.5 rounded-[10px] border border-risk-line bg-risk-bg px-[15px] py-2.5 text-xs text-risk"
+            role="status"
+          >
             브라우저에 진행 기록을 저장할 수 없어요. 이 창에서는 계속 진행할 수
             있지만 새로고침하면 기록이 사라질 수 있어요.
           </div>
@@ -393,8 +383,8 @@ export default function App() {
           />
         ) : (
           <>
-            <div className="play-layout">
-              <div className="play-main" key={step.id + ":" + replayVersion}>
+            <div>
+              <div key={step.id + ":" + replayVersion}>
                 {step.kind === "inspection" ? (
                   <ExploreView {...playProps} />
                 ) : step.kind === "checklist" ||

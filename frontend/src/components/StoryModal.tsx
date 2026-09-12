@@ -19,16 +19,22 @@ export function StoryModal({
   return (
     <dialog
       ref={dialog}
-      className="story-modal"
+      className={`m-auto hidden max-h-[calc(100svh-40px)] w-[min(560px,calc(100%-32px))] overflow-y-auto rounded-[20px]
+        border border-line bg-surface p-[26px] text-ink shadow-[0_20px_100px_#10251d2b] open:block
+        backdrop:bg-[#12261e66] backdrop:backdrop-blur-[4px] max-[600px]:p-[21px]`}
       aria-labelledby="story-modal-title"
       onCancel={(event) => {
         event.preventDefault();
         onClose();
       }}
     >
-      <div className="modal-heading">
+      <div className="mb-5 flex items-center justify-between gap-[15px] border-b border-line pb-[15px] [&_h2]:text-[1.03rem]">
         <h2 id="story-modal-title">{title}</h2>
-        <button className="icon-button" onClick={onClose} aria-label="닫기">
+        <button
+          className="grid size-8 shrink-0 place-items-center rounded-[9px] text-muted hover:bg-soft hover:text-ink [&_svg]:size-[17px]"
+          onClick={onClose}
+          aria-label="닫기"
+        >
           <Icon name="close" />
         </button>
       </div>
@@ -45,6 +51,7 @@ export function ScenePopup({
   actions,
   alert = false,
   className = "",
+  dictionary = false,
 }: {
   title: string;
   onClose: () => void;
@@ -52,6 +59,7 @@ export function ScenePopup({
   actions?: ReactNode;
   alert?: boolean;
   className?: string;
+  dictionary?: boolean;
 }) {
   const panel = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -66,9 +74,20 @@ export function ScenePopup({
     };
   }, []);
   return (
-    <div className="scene-popup-layer">
+    <div
+      className={`group/popup absolute inset-0 z-10 flex items-center justify-center bg-backdrop p-3 backdrop-blur-[3px]
+      data-[dictionary=true]:justify-end data-[dictionary=true]:backdrop-filter-none max-[600px]:p-2`}
+      data-warning={alert}
+      data-dictionary={dictionary}
+    >
       <div
-        className={"scene-popup " + (alert ? "warning-popup " : "") + className}
+        className={
+          `flex min-h-0 max-h-full w-[min(620px,100%)] flex-col rounded-2xl border border-line bg-surface
+          shadow-[0_12px_60px_#102d2930] outline-none group-data-[warning=true]/popup:border-risk-line
+          group-data-[dictionary=true]/popup:w-[335px] group-data-[dictionary=true]/popup:self-stretch
+          max-[600px]:rounded-xl max-[600px]:group-data-[dictionary=true]/popup:w-[min(320px,100%)] ` +
+          className
+        }
         role={alert ? "alertdialog" : "dialog"}
         aria-modal="true"
         aria-label={title}
@@ -95,17 +114,45 @@ export function ScenePopup({
           }
         }}
       >
-        <div className="popup-heading">
-          <span className="popup-icon">
+        <div
+          className={`flex shrink-0 items-start gap-2.5 px-[19px] pt-[17px] pb-3 [&_h2]:flex-1 [&_h2]:pt-0.5
+          [&_h2]:text-[0.9rem] [&_h2]:leading-[1.7] [&>button]:-mt-0.5 [&>button]:-mr-[5px]
+          group-data-[warning=true]/popup:mb-[13px] group-data-[warning=true]/popup:rounded-t-[15px]
+          group-data-[warning=true]/popup:bg-risk-bg group-data-[warning=true]/popup:text-risk
+          group-data-[dictionary=true]/popup:pb-[17px] max-[600px]:gap-[7px] max-[600px]:px-[11px]
+          max-[600px]:pt-2.5 max-[600px]:pb-2 max-[600px]:[&_h2]:text-[0.74rem] max-[600px]:[&_h2]:leading-[1.65]
+          max-[600px]:[&>button]:size-[27px] max-[600px]:group-data-[warning=true]/popup:mb-[9px]
+          max-[600px]:group-data-[warning=true]/popup:rounded-t-[11px]
+          max-[600px]:group-data-[dictionary=true]/popup:pb-3`}
+        >
+          <span
+            className={`grid h-7 flex-[0_0_28px] place-items-center rounded-[9px] bg-accent-soft text-accent [&_svg]:size-[17px]
+            group-data-[warning=true]/popup:bg-risk group-data-[warning=true]/popup:text-surface max-[600px]:h-[23px]
+            max-[600px]:basis-[23px] max-[600px]:rounded-[7px] max-[600px]:[&_svg]:size-3.5`}
+          >
             <Icon name={alert ? "info" : "book"} />
           </span>
           <h2>{title}</h2>
-          <button className="icon-button" onClick={onClose} aria-label="닫기">
+          <button
+            className="grid size-8 shrink-0 place-items-center rounded-[9px] text-muted hover:bg-soft hover:text-ink [&_svg]:size-[17px]"
+            onClick={onClose}
+            aria-label="닫기"
+          >
             <Icon name="close" />
           </button>
         </div>
-        <div className="popup-body">{children}</div>
-        {actions && <div className="popup-actions">{actions}</div>}
+        <div className="min-h-0 overflow-y-auto px-5 pb-4 [scrollbar-width:thin] group-data-[dictionary=true]/popup:pb-5 max-[600px]:px-[13px] max-[600px]:pb-3">
+          {children}
+        </div>
+        {actions && (
+          <div
+            className={`flex shrink-0 items-center justify-end gap-3 border-t border-line px-[19px] py-2.5 max-[600px]:px-[11px]
+          max-[600px]:py-[7px] max-[600px]:[&>button]:min-h-[33px] max-[600px]:[&>button]:px-[13px]
+          max-[600px]:[&>button]:py-[7px] max-[600px]:[&>button]:text-[0.68rem]`}
+          >
+            {actions}
+          </div>
+        )}
       </div>
     </div>
   );

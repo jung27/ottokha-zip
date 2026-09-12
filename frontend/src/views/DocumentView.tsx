@@ -17,8 +17,12 @@ function Paper({
 }) {
   const registry = step.document === "registry";
   return (
-    <section className="paper-document">
-      <div className="paper-heading">
+    <section className="mx-auto w-[min(720px,100%)] rounded-[7px] border border-line bg-surface px-[26px] py-5 text-ink shadow-panel max-[600px]:p-[15px]">
+      <div
+        className={`flex items-center justify-between gap-4 border-b-2 border-line pb-3.5 [&_h2]:text-[0.97rem]
+        [&_h2]:tracking-[0.06em] [&>span]:text-[0.6rem] [&>span]:whitespace-nowrap [&>span]:text-muted
+        max-[600px]:[&_h2]:text-[0.82rem]`}
+      >
         <h2>
           {registry
             ? "등기사항전부증명서"
@@ -31,7 +35,12 @@ function Paper({
         {step.document && <span>가상 서류</span>}
       </div>
       {registry ? (
-        <dl className="paper-fields">
+        <dl
+          className={`m-0 text-[0.73rem] [&>div]:grid [&>div]:grid-cols-[120px_1fr] [&>div]:gap-3 [&>div]:border-b
+          [&>div]:border-line [&>div]:py-[11px] [&_dt]:text-muted [&_dd]:m-0
+          max-[600px]:[&>div]:grid-cols-[75px_1fr] max-[600px]:[&>div]:gap-[7px] max-[600px]:[&>div]:py-[9px]
+          max-[600px]:[&>div]:text-[0.65rem]`}
+        >
           <div>
             <dt>표제부 · 건물</dt>
             <dd>○○동 가상 매물 · {home.name}</dd>
@@ -59,7 +68,12 @@ function Paper({
         </dl>
       ) : (
         step.document && (
-          <dl className="paper-fields">
+          <dl
+            className={`m-0 text-[0.73rem] [&>div]:grid [&>div]:grid-cols-[120px_1fr] [&>div]:gap-3 [&>div]:border-b
+            [&>div]:border-line [&>div]:py-[11px] [&_dt]:text-muted [&_dd]:m-0
+            max-[600px]:[&>div]:grid-cols-[75px_1fr] max-[600px]:[&>div]:gap-[7px] max-[600px]:[&>div]:py-[9px]
+            max-[600px]:[&>div]:text-[0.65rem]`}
+          >
             <div>
               <dt>소재지</dt>
               <dd>
@@ -136,16 +150,18 @@ export function DocumentView(
       scene={
         interactive || answered ? (
           <Paper step={step} home={home} contract={contract}>
-            <fieldset className="checklist" disabled={answered}>
+            <fieldset
+              className="mt-[18px] min-w-0 border-0 p-0 [&_legend]:mb-[9px] [&_legend]:text-[0.76rem] [&_legend]:font-[650]"
+              disabled={answered}
+            >
               <legend>
                 {step.id === "clauses" ? "특약사항" : "확인할 항목"}
               </legend>
               {step.items?.map((item) => (
                 <label
-                  className={
-                    "checklist-item " +
-                    (selected.includes(item.id) ? "selected" : "")
-                  }
+                  className={`flex cursor-pointer items-start gap-3 border-b border-line py-2.5 text-[0.75rem] leading-[1.8]
+                    has-[:checked]:text-accent [&_input]:mt-[3px] [&_input]:size-4 [&_input]:shrink-0 [&_input]:accent-accent
+                    max-[600px]:gap-[9px] max-[600px]:text-[0.69rem] `}
                   key={item.id}
                 >
                   <input
@@ -194,7 +210,9 @@ export function DocumentView(
         }
       >
         {interactive && !answered && step.requireAll && (
-          <p className="small muted">전부 다 체크하고 다음으로 넘어가기</p>
+          <p className="text-xs text-muted">
+            전부 다 체크하고 다음으로 넘어가기
+          </p>
         )}
       </DialogueBox>
     </SceneFrame>

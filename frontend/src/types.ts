@@ -18,15 +18,24 @@ export type Page =
   | "ending";
 export type ModalKind = "new" | "conditions" | "appendix" | null;
 export type Background =
+  | HouseId
   | "home"
   | "app"
-  | "listing"
   | "message"
+  | "deposit-message"
+  | "owner-account"
+  | "account-change"
+  | "balance-day"
+  | "settlement"
+  | "insurance"
+  | "defect"
+  | "room-entry"
   | "room"
   | "street"
   | "office"
   | "agent"
   | "lease"
+  | "signing"
   | "moving"
   | "rain";
 export type StoryBeat = {

@@ -11,18 +11,31 @@ const promptSuggestions = [
 
 function ReviewCards({ notes }: { notes: Checkpoint[] }) {
   return (
-    <div className="review-cards">
+    <div className="grid gap-3.5">
       {notes.map((note) => (
-        <article className={"review-card " + note.status} key={note.id}>
-          <div className="review-card-top">
-            <span className="review-status">
+        <article
+          className={`group/review rounded-[14px] border border-line p-[22px] data-[status=risk]:border-risk-line [&>p]:mt-2
+          [&>p]:text-[0.79rem] [&>p]:whitespace-pre-line [&>p]:text-muted max-[600px]:rounded-xl max-[600px]:p-4
+          max-[600px]:[&>p]:text-[0.73rem] max-[600px]:[&_h3]:text-[0.83rem] `}
+          data-status={note.status}
+          key={note.id}
+        >
+          <div className="mb-3.5 flex items-start gap-3 border-b border-line pb-[13px] [&_p]:text-[0.83rem] max-[600px]:gap-[9px] max-[600px]:[&_p]:text-[0.75rem]">
+            <span
+              className={`rounded-md bg-accent-soft px-2 py-[5px] text-[0.65rem] font-semibold whitespace-nowrap text-accent
+              group-data-[status=risk]/review:bg-risk-bg group-data-[status=risk]/review:text-risk`}
+            >
               {note.status === "risk" ? "다시 확인" : "확인함"}
             </span>
             <p>{note.choice}</p>
           </div>
           <h3>{note.title}</h3>
           <p>{note.consequence}</p>
-          {note.advice && <div className="review-advice">{note.advice}</div>}
+          {note.advice && (
+            <div className="mt-[15px] rounded-[9px] bg-soft px-[15px] py-3 text-xs leading-[1.85]">
+              {note.advice}
+            </div>
+          )}
         </article>
       ))}
     </div>
@@ -82,14 +95,23 @@ export function HomeView({
   if (ending) {
     const stageNotes = notes.filter((note) => note.stage === stage);
     return (
-      <div className="ending-view">
-        <div className="ending-heading">
-          <span className="section-kicker">나의 첫 임대계약</span>
+      <div className="mx-auto max-w-[1020px] py-8 max-[600px]:px-1 max-[600px]:py-[25px]">
+        <div className="mb-9 text-center [&>p]:mt-3.5 [&>p]:text-[0.93rem] [&>p]:text-muted max-[600px]:[&_h1]:text-[1.6rem] max-[600px]:[&_p]:text-[0.83rem]">
+          <span className="mb-[9px] block text-[0.72rem] font-[650] text-accent">
+            나의 첫 임대계약
+          </span>
           <h1>이번 계약을 돌아보며</h1>
           <p>{ending.text}</p>
         </div>
         <div
-          className="review-stage-tabs"
+          className={`mb-[30px] grid grid-cols-5 gap-[9px] [&_button]:flex [&_button]:flex-col [&_button]:items-center
+            [&_button]:gap-[7px] [&_button]:rounded-[13px] [&_button]:border [&_button]:border-line [&_button]:bg-soft
+            [&_button]:px-2 [&_button]:py-[15px] [&_button]:text-[0.78rem]
+            [&_button[aria-selected=true]]:border-accent [&_button[aria-selected=true]]:bg-accent-soft
+            [&_button[aria-selected=true]]:text-accent [&_svg]:size-[21px] [&_small]:text-[0.62rem]
+            [&_small]:text-muted max-[600px]:gap-[5px] max-[600px]:[&_button]:gap-1.5
+            max-[600px]:[&_button]:rounded-[10px] max-[600px]:[&_button]:px-[3px] max-[600px]:[&_button]:py-3
+            max-[600px]:[&_button]:text-[0.63rem] max-[600px]:[&_small]:text-[0.53rem] max-[600px]:[&_svg]:size-[18px]`}
           role="tablist"
           aria-label="단계별 계약 리뷰"
         >
@@ -120,10 +142,14 @@ export function HomeView({
           role="tabpanel"
           aria-labelledby={"review-tab-" + stage}
         >
-          <div className="review-heading">
+          <div className="mb-[15px] flex items-center justify-between gap-3.5 [&_h2]:text-[1.13rem] [&_button]:px-3 [&_button]:py-[9px] [&_button]:text-[0.72rem]">
             <h2>{STAGES.find((item) => item.id === stage)?.title}</h2>
             <button
-              className="secondary-button"
+              className={`inline-flex min-h-[42px] items-center justify-center gap-[9px] rounded-[10px] px-[18px] py-[11px]
+                text-[0.79rem] font-[650] leading-[1.45] whitespace-normal transition-[background,border-color]
+                duration-150 ease-[ease] [&_svg]:size-4 [&_svg]:shrink-0 max-[600px]:min-h-10 max-[600px]:px-3.5
+                max-[600px]:py-2.5 max-[600px]:text-[0.74rem] border border-line bg-surface text-ink
+                enabled:hover:border-accent enabled:hover:bg-accent-soft`}
               onClick={() => onReplay(stageNotes[0]?.stepId ?? "listing")}
             >
               <Icon name="reset" />이 단계 다시 보기
@@ -131,17 +157,48 @@ export function HomeView({
           </div>
           <ReviewCards notes={stageNotes} />
         </section>
-        <div className="ending-actions">
-          <button className="text-button" onClick={onStartNew}>
+        <div
+          className={`mt-7 flex flex-wrap justify-center gap-2.5 border-t border-line pt-[26px] max-[600px]:gap-2
+          max-[600px]:[&>button]:p-2.5 max-[600px]:[&>button]:text-[0.68rem]`}
+        >
+          <button
+            className={`inline-flex min-h-[42px] items-center justify-center gap-[9px] rounded-[10px] px-1.5 py-[11px]
+            text-[0.79rem] font-[650] leading-[1.45] whitespace-normal transition-[background,border-color]
+            duration-150 ease-[ease] [&_svg]:size-4 [&_svg]:shrink-0 max-[600px]:min-h-10 max-[600px]:px-3.5
+            max-[600px]:py-2.5 max-[600px]:text-[0.74rem] text-muted hover:text-accent`}
+            onClick={onStartNew}
+          >
             처음부터
           </button>
-          <button className="secondary-button" onClick={onSameHome}>
+          <button
+            className={`inline-flex min-h-[42px] items-center justify-center gap-[9px] rounded-[10px] px-[18px] py-[11px]
+            text-[0.79rem] font-[650] leading-[1.45] whitespace-normal transition-[background,border-color]
+            duration-150 ease-[ease] [&_svg]:size-4 [&_svg]:shrink-0 max-[600px]:min-h-10 max-[600px]:px-3.5
+            max-[600px]:py-2.5 max-[600px]:text-[0.74rem] border border-line bg-surface text-ink
+            enabled:hover:border-accent enabled:hover:bg-accent-soft`}
+            onClick={onSameHome}
+          >
             같은 집, 다른 선택
           </button>
-          <button className="secondary-button" onClick={onOtherHome}>
+          <button
+            className={`inline-flex min-h-[42px] items-center justify-center gap-[9px] rounded-[10px] px-[18px] py-[11px]
+            text-[0.79rem] font-[650] leading-[1.45] whitespace-normal transition-[background,border-color]
+            duration-150 ease-[ease] [&_svg]:size-4 [&_svg]:shrink-0 max-[600px]:min-h-10 max-[600px]:px-3.5
+            max-[600px]:py-2.5 max-[600px]:text-[0.74rem] border border-line bg-surface text-ink
+            enabled:hover:border-accent enabled:hover:bg-accent-soft`}
+            onClick={onOtherHome}
+          >
             다른 조합 해보기
           </button>
-          <button className="primary-button" onClick={onAppendix}>
+          <button
+            className={`inline-flex min-h-[42px] items-center justify-center gap-[9px] rounded-[10px] px-[18px] py-[11px]
+            text-[0.79rem] font-[650] leading-[1.45] whitespace-normal transition-[background,border-color]
+            duration-150 ease-[ease] [&_svg]:size-4 [&_svg]:shrink-0 max-[600px]:min-h-10 max-[600px]:px-3.5
+            max-[600px]:py-2.5 max-[600px]:text-[0.74rem] border border-mint bg-mint text-[#173d29]
+            enabled:hover:border-[#b1dbbf] enabled:hover:bg-[#b1dbbf]`}
+            data-button="primary"
+            onClick={onAppendix}
+          >
             부록
             <Icon name="external" />
           </button>
@@ -150,21 +207,44 @@ export function HomeView({
     );
   }
   return (
-    <section className="home-view">
-      <div className="home-logo">
-        <span className="home-logo-mark">
+    <section
+      className={`flex min-h-[calc(100svh-130px)] flex-col items-center justify-center pt-12 pb-[88px] text-center
+      max-[600px]:min-h-[calc(100svh-100px)] max-[600px]:px-1 max-[600px]:pt-[35px] max-[600px]:pb-[65px]`}
+    >
+      <div
+        className={`flex items-center gap-4 [&_h1]:text-[clamp(2.7rem,6vw,4.25rem)] [&_h1]:font-extrabold
+        [&_h1]:tracking-[-0.075em] [&_h1>span]:text-accent max-[600px]:gap-2.5`}
+      >
+        <span
+          className={`flex size-[66px] items-center justify-center rounded-[20px] border border-line bg-accent-soft text-accent
+          [&_svg]:size-[39px] max-[800px]:size-[57px] max-[800px]:rounded-[17px] max-[800px]:[&_svg]:size-8
+          max-[600px]:size-[49px] max-[600px]:rounded-[14px] max-[600px]:[&_svg]:size-7`}
+        >
           <Icon name="door" />
         </span>
         <h1>
           어떡하집<span>?</span>
         </h1>
       </div>
-      <p className="home-subtitle">
+      <p className="mt-[22px] mb-8 text-[0.94rem] leading-[1.9] text-muted max-[600px]:mt-5 max-[600px]:mb-[26px] max-[600px]:text-[0.84rem]">
         내 상황에 맞는 조건으로,
         <br />첫 번째 계약을 시작해보세요.
       </p>
-      <div className="home-input-area">
-        <form onSubmit={submit} className="recommendation-form">
+      <div className="w-full max-w-[760px]">
+        <form
+          onSubmit={submit}
+          className={`flex items-center gap-2.5 rounded-[18px] border border-line bg-surface p-[9px]
+          shadow-[0_8px_38px_#284f3320] focus-within:border-accent [&>svg]:ml-2.5 [&>svg]:size-[19px]
+          [&>svg]:shrink-0 [&>svg]:text-accent [&_input]:min-w-0 [&_input]:w-full [&_input]:border-0
+          [&_input]:bg-transparent [&_input]:px-[5px] [&_input]:py-[13px] [&_input]:text-[0.85rem]
+          [&_input]:text-ink [&_input]:outline-none [&_input::placeholder]:text-muted
+          [&_[data-button=primary]]:min-h-[46px] [&_[data-button=primary]]:shrink-0
+          [&_[data-button=primary]]:px-[21px] max-[600px]:gap-[5px] max-[600px]:rounded-[14px] max-[600px]:p-[7px]
+          max-[600px]:[&>svg]:hidden max-[600px]:[&_input]:px-1.5 max-[600px]:[&_input]:py-[11px]
+          max-[600px]:[&_input]:text-[0.73rem] max-[600px]:[&_[data-button=primary]]:min-h-[42px]
+          max-[600px]:[&_[data-button=primary]]:gap-1.5 max-[600px]:[&_[data-button=primary]]:px-3
+          max-[600px]:[&_[data-button=primary]]:py-2.5 max-[600px]:[&_[data-button=primary]]:text-[0.7rem]`}
+        >
           <Icon name="spark" />
           <label className="sr-only" htmlFor="situation">
             나의 상황
@@ -178,7 +258,12 @@ export function HomeView({
             maxLength={1000}
           />
           <button
-            className="primary-button"
+            className={`inline-flex min-h-[42px] items-center justify-center gap-[9px] rounded-[10px] px-[18px] py-[11px]
+              text-[0.79rem] font-[650] leading-[1.45] whitespace-normal transition-[background,border-color]
+              duration-150 ease-[ease] [&_svg]:size-4 [&_svg]:shrink-0 max-[600px]:min-h-10 max-[600px]:px-3.5
+              max-[600px]:py-2.5 max-[600px]:text-[0.74rem] border border-mint bg-mint text-[#173d29]
+              enabled:hover:border-[#b1dbbf] enabled:hover:bg-[#b1dbbf]`}
+            data-button="primary"
             type="submit"
             disabled={!prompt.trim() || loading}
           >
@@ -187,11 +272,17 @@ export function HomeView({
           </button>
         </form>
         {error && (
-          <p className="request-error" role="alert">
+          <p className="mt-3 text-[0.78rem] text-risk" role="alert">
             {error}
           </p>
         )}
-        <div className="prompt-suggestions">
+        <div
+          className={`mt-[18px] flex flex-wrap justify-center gap-2 [&_button]:rounded-lg [&_button]:border
+          [&_button]:border-line [&_button]:bg-soft [&_button]:px-[11px] [&_button]:py-[7px]
+          [&_button]:text-[0.66rem] [&_button]:text-muted [&_button:enabled:hover]:border-accent
+          [&_button:enabled:hover]:text-accent max-[600px]:mt-3.5 max-[600px]:gap-1.5 max-[600px]:[&_button]:px-2
+          max-[600px]:[&_button]:text-[0.6rem]`}
+        >
           {promptSuggestions.map((text) => (
             <button
               key={text}
@@ -202,9 +293,13 @@ export function HomeView({
             </button>
           ))}
         </div>
-        <div className="home-direct">
+        <div className="mt-7 max-[600px]:mt-6">
           <button
-            className="secondary-button"
+            className={`inline-flex min-h-[42px] items-center justify-center gap-[9px] rounded-[10px] px-[18px] py-[11px]
+              text-[0.79rem] font-[650] leading-[1.45] whitespace-normal transition-[background,border-color]
+              duration-150 ease-[ease] [&_svg]:size-4 [&_svg]:shrink-0 max-[600px]:min-h-10 max-[600px]:px-3.5
+              max-[600px]:py-2.5 max-[600px]:text-[0.74rem] border border-line bg-surface text-ink
+              enabled:hover:border-accent enabled:hover:bg-accent-soft`}
             onClick={onChooseConditions}
             disabled={loading}
           >
@@ -214,7 +309,11 @@ export function HomeView({
         </div>
       </div>
       {started && (
-        <button className="resume-button" disabled={loading} onClick={onResume}>
+        <button
+          className="mt-7 inline-flex min-h-10 items-center gap-[7px] text-[0.77rem] text-accent [&_svg]:size-[15px]"
+          disabled={loading}
+          onClick={onResume}
+        >
           <Icon name="reset" />
           이어서 하기
         </button>
