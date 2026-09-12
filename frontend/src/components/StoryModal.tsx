@@ -23,7 +23,8 @@ export function StoryModal({
   return (
     <dialog
       ref={dialogRef}
-      className="m-auto rounded-xl border border-[#40514f] bg-[#19272e] p-6 text-[#f0f3f2] shadow-2xl backdrop:bg-[#071018]/70 backdrop:blur-sm max-w-lg w-full"
+      className="story-modal m-auto rounded-xl border border-[#40514f] bg-[#19272e] p-6 text-[#f0f3f2] shadow-2xl backdrop:bg-[#071018]/70 backdrop:blur-sm"
+      aria-labelledby="story-modal-title"
       onCancel={(e) => {
         e.preventDefault();
         onClose();
@@ -41,7 +42,9 @@ export function StoryModal({
       }}
     >
       <div className="flex items-center justify-between mb-5 border-b border-[#2c373e] pb-3">
-        <h2 className="text-xl font-bold">{title}</h2>
+        <h2 id="story-modal-title" className="text-xl font-bold">
+          {title}
+        </h2>
         <button
           className="btn btn-ghost btn-circle btn-sm"
           onClick={onClose}

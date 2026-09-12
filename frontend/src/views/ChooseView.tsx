@@ -1,122 +1,74 @@
-import { Icon } from "../components/Icon";
-import { homes } from "../data";
-import type { Contract, Home } from "../types";
+import { useState } from "react";
+import { DialogueBox, NextButton, SceneFrame } from "../components/Journal";
+import { contractLabel, homes, priceLabel, tutorials } from "../data";
+import type { Contract, Home, HouseId, Page } from "../types";
 
-export function ChooseView({
-  home,
-  contract,
-  currentHouse,
-  price,
-  onChooseContract,
-  onChooseHome,
-  onNext,
-}: {
-  home: Home;
-  contract: Contract;
-  currentHouse: number;
-  price: string;
-  onChooseContract: (c: Contract) => void;
-  onChooseHome: (idx: number) => void;
+const prologueText = [
+  "2월.\n처음으로 내가 살 집을 직접 구하려 한다.",
+  "보증금과 매달 나갈 돈을 생각하며, 내 생활에 맞는 집을 찾아보기로 했다. 집을 고르는 것도, 계약을 하는 것도 아직은 낯설다.",
+  "부동산 앱을 켠다. 수백 개의 매물이 뜬다. 가격과 조건이 제각각이라 혼란스럽다. 어디서부터 살펴봐야 할까?",
+];
+const descriptions = {
+  monthly: "보증금 500~2,000만 원 + 월세 + 관리비. 목돈이 적게 들어가는 대신, 매달 통장에서 돈이 빠져나간다.",
+  jeonse: "내 돈에 전세대출을 보태 보증금을 마련한다. 월세는 없지만, 매달 대출이자와 관리비가 나간다. 대출로 마련할 수 있는 금액과 계약이 끝났을 때 보증금을 돌려받을 수 있을지 함께 따져봐야 한다.",
+};
+export function ChooseView({ page, prologue, home, contract, onChooseContract, onChooseHome, onNext, onBack }: {
+  page: Page; prologue: number; home: Home; contract: Contract;
+  onChooseContract: (contract: Contract) => void;
+  onChooseHome: (id: HouseId) => void;
   onNext: () => void;
+  onBack: () => void;
 }) {
+  const [line, setLine] = useState(0);
+  if (page === "prologue") return (
+    <SceneFrame background={prologue < 2 ? "home" : "app"} context={prologueText[prologue]}>
+      <DialogueBox text={prologueText[prologue]} actions={<NextButton onClick={onNext} />} />
+    </SceneFrame>
+  );
+  if (page === "tutorial") return (
+    <SceneFrame background="app" context={tutorials[contract][line]}>
+      <DialogueBox text={tutorials[contract][line]} actions={<>
+        <button className="text-button" onClick={() => line ? setLine(line - 1) : onBack()}>이전</button>
+        <NextButton onClick={() => line < tutorials[contract].length - 1 ? setLine(line + 1) : onNext()} />
+      </>} />
+    </SceneFrame>
+  );
   return (
-    <div className="space-y-6 pt-6">
-      <div className="border-b border-[#2c373e] pb-4">
-        <span className="text-xs text-[#add9b9]">
-          첫 번째 장면 · 집을 고르다
-        </span>
-        <h1 className="text-2xl font-bold text-white mt-1">
-          어떤 집에서 시작할까?
-        </h1>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <div>
-            <h2 className="text-sm font-semibold text-gray-300 mb-3">
-              01. 어떤 계약으로 구할까?
-            </h2>
-            <div className="grid grid-cols-2 gap-3">
-              {(["monthly", "jeonse"] as const).map((type) => (
-                <button
-                  key={type}
-                  onClick={() => onChooseContract(type)}
-                  className={`p-4 rounded-lg border text-left flex flex-col justify-between transition ${
-                    contract === type
-                      ? "border-[#add9b9] bg-[#1d2c2b]"
-                      : "border-[#2c373e] bg-[#141e25] hover:bg-gray-800"
-                  }`}
-                >
-                  <span className="font-bold text-white">
-                    {type === "monthly" ? "월세" : "전세 + 대출"}
-                  </span>
-                  <span className="text-xs text-gray-400 mt-1">
-                    {type === "monthly"
-                      ? "보증금과 매달 내는 임대료"
-                      : "목돈과 대출 조건을 함께 살펴보기"}
-                  </span>
+    <SceneFrame background="app" context={page === "contract" ? descriptions[contract] : home.description + priceLabel(home, contract) + home.turningPoint}>
+      <DialogueBox text={page === "contract" ? "어떤 방식으로 계약할까?" : "어떤 집에서 살까?"}
+        actions={<>
+          <button className="text-button" onClick={onBack}>이전</button>
+          <NextButton onClick={onNext} />
+        </>}>
+        {page === "contract" ? (
+          <div className="contract-choices choices-container">
+            {(["monthly", "jeonse"] as Contract[]).map((type) => (
+              <button key={type} aria-pressed={contract === type}
+                className={"setup-choice " + (contract === type ? "selected" : "")}
+                onClick={() => onChooseContract(type)}>
+                <strong>{contractLabel(type)}</strong><p>{descriptions[type]}</p>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <>
+            <div className="house-choices choices-container">
+              {homes.map((item) => (
+                <button key={item.id} className={"setup-choice " + (home.id === item.id ? "selected" : "")}
+                  disabled={contract === "jeonse" && item.jeonse === null}
+                  aria-pressed={home.id === item.id} onClick={() => onChooseHome(item.id)}>
+                  {item.name}{item.id === "oneroom" ? " (다가구)" : item.id === "villa" ? " (다세대)" : ""}
+                  {contract === "jeonse" && item.jeonse === null && <small>월세만 가능</small>}
                 </button>
               ))}
             </div>
-          </div>
-
-          <div>
-            <h2 className="text-sm font-semibold text-gray-300 mb-3">
-              02. 어떤 공간에서 살고 싶어?
-            </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {homes.map((item, idx) => (
-                <button
-                  key={item.name}
-                  onClick={() => onChooseHome(idx)}
-                  className={`p-4 rounded-lg border text-left transition flex flex-col justify-between min-h-[120px] ${
-                    currentHouse === idx
-                      ? "border-[#add9b9] bg-[#1d2c2b]"
-                      : "border-[#2c373e] bg-[#141e25] hover:bg-gray-800"
-                  }`}
-                >
-                  <Icon
-                    name={item.icon}
-                    className={
-                      currentHouse === idx ? "text-[#add9b9]" : "text-gray-400"
-                    }
-                  />
-                  <div>
-                    <div className="font-bold text-white text-sm">
-                      {item.name}
-                    </div>
-                    <div className="text-xs text-gray-400">{item.sub}</div>
-                  </div>
-                </button>
-              ))}
+            <div className="house-description" aria-live="polite">
+              <p>{home.description}</p><p className="price-label">{priceLabel(home, contract)}</p>
+              <p className="small muted">{home.turningPoint}</p>
             </div>
-          </div>
-        </div>
-
-        <aside className="rounded-xl border border-[#364249] bg-[#172128] p-5 flex flex-col justify-between space-y-4">
-          <div className="space-y-3">
-            <span className="badge badge-sm badge-outline text-[#add9b9] border-[#add9b9]">
-              가상 매물
-            </span>
-            <h2 className="text-xl font-bold text-white">{home.desc}</h2>
-            <div className="text-2xl font-bold text-[#add9b9]">
-              {price}{" "}
-              <span className="text-xs text-gray-400 font-normal">만원</span>
-            </div>
-            <p className="text-xs text-gray-400 pre-line">
-              {contract === "jeonse"
-                ? "이 집은 대출이 가능할까? 가능 여부와 조건부터 확인해 보자."
-                : home.hint}
-            </p>
-          </div>
-          <button
-            className="btn w-full bg-[#add9b9] hover:bg-[#c5e9ce] text-[#15271d] font-bold border-none"
-            onClick={onNext}
-          >
-            이 집 보러 가기 <Icon name="arrow" />
-          </button>
-        </aside>
-      </div>
-    </div>
+          </>
+        )}
+      </DialogueBox>
+    </SceneFrame>
   );
 }

@@ -1,79 +1,51 @@
-import roomImage from "../assets/room.png";
-import { Icon } from "../components/Icon";
-import { chapterCards } from "../data";
-import type { Scene } from "../types";
+import { useState } from "react";
+import { DialogueBox, NextButton, SceneFrame } from "../components/Journal";
+import { STAGES, type Checkpoint, type Ending } from "../types";
 
-export function HomeView({
-  started,
-  lastScene,
-  onStartNew,
-  onNavigate,
-}: {
-  started: boolean;
-  lastScene: Scene;
-  onStartNew: () => void;
-  onNavigate: (scene: Scene) => void;
+export function RiskReview({ notes, onReplay }: { notes: Checkpoint[]; onReplay?: (step: string) => void }) {
+  const risks = notes.filter((note) => note.status === "risk");
+  return <div className="risk-review">
+    {risks.length === 0 ? <p>경고가 발생한 항목은 없다.</p> : STAGES.map((stage) => {
+      const items = risks.filter((note) => note.stage === stage.id);
+      return items.length > 0 && <section key={stage.id} className="review-stage">
+        <h3>{stage.title}</h3>
+        {items.map((note) => <details className="review-item" key={note.id}>
+          <summary><span className="risk-dot">!</span><span>{note.title}<small>{note.choice}</small></span></summary>
+          <div className="review-content">
+            <p>{note.consequence}</p><p className="review-advice">{note.advice}</p>
+            {onReplay && <button className="text-button" onClick={() => onReplay(note.stepId)}>이 장면부터 다시 선택</button>}
+          </div>
+        </details>)}
+      </section>;
+    })}
+  </div>;
+}
+export function HomeView({ started, onStartNew, onResume, ending, notes = [], onReplay, onSameHome, onOtherHome }: {
+  started: boolean; onStartNew: () => void; onResume: () => void; ending?: Ending;
+  notes?: Checkpoint[]; onReplay: (step: string) => void; onSameHome: () => void; onOtherHome: () => void;
 }) {
+  const [review, setReview] = useState(false);
+  if (ending) return (
+    <SceneFrame background="street" context="보증금 반환 임차인 임대인">
+      <DialogueBox text={review ? undefined : ending.title}
+        actions={review ? <>
+          <button className="text-button" onClick={onStartNew}>처음부터</button>
+          <button className="secondary-button" onClick={onOtherHome}>다른 조합 해보기</button>
+          <NextButton onClick={onSameHome}>같은 집, 다른 선택</NextButton>
+        </> : <NextButton onClick={() => setReview(true)} />}>
+        {review && <><h1 className="review-title">당신이 놓친 것들</h1><RiskReview notes={notes} onReplay={onReplay} /></>}
+      </DialogueBox>
+    </SceneFrame>
+  );
   return (
-    <div className="space-y-8 pt-4">
-      <section className="relative rounded-2xl border border-[#334047] overflow-hidden bg-[#17242b] min-h-[480px] flex items-center p-8 sm:p-12">
-        <div
-          className="absolute inset-0 z-0 bg-cover bg-center opacity-30"
-          style={{ backgroundImage: `url(${roomImage})` }}
-        />
-        <div className="relative z-10 max-w-xl space-y-6">
-          <div className="inline-flex items-center gap-2 text-xs font-semibold tracking-wider text-[#add9b9]">
-            <span className="w-6 h-px bg-[#add9b9]" /> 처음 만나는 나의 집
-          </div>
-          <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-white leading-tight">
-            괜찮은 집,
-            <br />
-            <span className="text-[#add9b9]">찾을 수 있을까?</span>
-          </h1>
-          <p className="text-gray-300 text-sm sm:text-base leading-relaxed">
-            낯선 동네, 처음 보는 계약서.
-            <br />
-            당신의 선택으로 시작되는 첫 번째 독립 이야기.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3 pt-2">
-            <button
-              className="btn bg-[#add9b9] hover:bg-[#c5e9ce] text-[#15271d] font-bold border-none"
-              onClick={onStartNew}
-            >
-              새로운 이야기 시작 <Icon name="arrow" />
-            </button>
-            <button
-              className="btn btn-outline border-gray-600 text-gray-300 hover:bg-gray-800"
-              disabled={!started}
-              onClick={() => onNavigate(lastScene)}
-            >
-              <Icon name="reset" /> 이어서 하기
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {chapterCards.map((card) => (
-          <button
-            key={card.number}
-            onClick={() => onNavigate(card.scene)}
-            className="flex items-center gap-4 p-5 rounded-xl border border-[#2c373e] bg-[#151f26] hover:bg-[#1c2931] text-left transition"
-          >
-            <div className="w-12 h-12 rounded-lg bg-[#1a2a2d] border border-[#394a4c] flex items-center justify-center text-[#add9b9]">
-              <Icon name={card.icon} />
-            </div>
-            <div className="flex-1">
-              <span className="text-xs font-mono text-gray-400">
-                CHAPTER {card.number}
-              </span>
-              <h3 className="font-bold text-white text-base">{card.title}</h3>
-              <p className="text-xs text-gray-400 mt-1">{card.description}</p>
-            </div>
-            <Icon name="arrow" className="text-gray-500 w-4 h-4" />
-          </button>
-        ))}
-      </section>
-    </div>
+    <SceneFrame background="street" className="home-scene" context="임대인 임차인 보증금 월세 전세">
+      <DialogueBox actions={<>
+        {started && <button className="secondary-button" onClick={onResume}>이어서 하기</button>}
+        <NextButton onClick={onStartNew}>{started ? "처음부터" : "시작하기"}</NextButton>
+      </>}>
+        <h1 className="game-title">어떡하집<span>?</span></h1>
+        <p className="dialogue-text">처음으로 내가 살 집을 직접 구하려 한다.</p>
+      </DialogueBox>
+    </SceneFrame>
   );
 }
