@@ -20,6 +20,43 @@ import { ExploreView } from "./views/ExploreView";
 import { HomeView } from "./views/HomeView";
 import { TalkView } from "./views/TalkView";
 
+// 실제 서버 API 기본 주소 (필요에 따라 변경)
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost";
+
+// 서버 응답 타입
+type ServerRecommendationResponse = {
+  first: "월세" | "전세 + 대출" | string;
+  second:
+    | "원룸"
+    | "오피스텔"
+    | "빌라"
+    | "옥탑방"
+    | "반지하"
+    | "고시원"
+    | string;
+};
+
+// 1차 분기 매핑
+function mapContract(first: string): Contract {
+  if (first.includes("전세")) return "jeonse";
+  return "monthly";
+}
+
+// 2차 분기 인덱스 1:1 매핑 (homes 배열의 순서와 일치)
+const HOUSE_INDEX_MAP: Record<string, number> = {
+  원룸: 0, // 원룸(다가구)
+  오피스텔: 1, // 오피스텔
+  빌라: 2, // 빌라(다세대)
+  옥탑방: 3, // 옥탑방
+  반지하: 4, // 반지하
+  고시원: 5, // 고시원
+};
+
+function mapHouseIndex(second: string): number {
+  // 정의된 6개 키워드 중 하나면 해당 인덱스 반환, 예외적인 값이면 기본값 0(원룸)
+  return HOUSE_INDEX_MAP[second] ?? 0;
+}
+
 const makeNewGame = (): GameState => ({
   started: false,
   contract: "monthly",
@@ -55,9 +92,6 @@ export default function App() {
   const [toast, setToast] = useState<string | null>(null);
   const appRef = useRef<HTMLDivElement>(null);
 
-  const home = homes[game.house];
-  const price = game.contract === "monthly" ? home.rent : home.deposit;
-
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(game));
@@ -89,7 +123,7 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [toast]);
 
-  // 키보드 숫자 단축키(1, 2, 3) 지원
+  // 키보드 1, 2, 3 숫자 단축키
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (modal || e.repeat || !["1", "2", "3"].includes(e.key)) return;
@@ -125,6 +159,57 @@ export default function App() {
     if (!game.notes.some((item) => item.id === note.id)) {
       setToast("수첩에 새로운 발견을 기록했어요.");
       setGame((prev) => ({ ...prev, notes: [...prev.notes, note] }));
+    }
+  }
+
+  // 서버 API 호출 및 결과 자동 적용 핸들러
+  async function handleStartWithAI(input: string) {
+    try {
+      const encodedQuery = encodeURIComponent(input);
+      const res = await fetch(`${API_BASE_URL}/api?text=${encodedQuery}`);
+
+      if (!res.ok) {
+        throw new Error(`서버 응답 오류: ${res.status}`);
+      }
+
+      const data: ServerRecommendationResponse = await res.json();
+
+      const contract = mapContract(data.first);
+      const houseIndex = mapHouseIndex(data.second);
+      const targetHome = homes[houseIndex];
+
+      // LLM이 골라준 조건으로 세팅하고 목적지를 'choose'로 지정
+      setGame({
+        ...makeNewGame(),
+        started: true,
+        contract,
+        house: houseIndex,
+        scene: "choose", // <-- explore 대신 choose로 이동
+        notes: [
+          {
+            id: "ai-prompt",
+            title: "AI 추천 계약 및 집 조건",
+            text: `“${input}” 상황을 바탕으로 [${data.first}] / [${targetHome.name}] 조건을 추천받았습니다.`,
+          },
+        ],
+      });
+
+      setToast(
+        `AI가 [${data.first}] · [${targetHome.name}]을(를) 골라두었어요!`,
+      );
+      navigate("choose"); // <-- ChooseView 화면으로 전환
+    } catch (error) {
+      console.error("AI 추천 호출 실패:", error);
+      setToast("서버 연결에 실패하여 기본 선택 화면으로 이동합니다.");
+
+      setGame({
+        ...makeNewGame(),
+        started: true,
+        contract: "monthly",
+        house: 0,
+        scene: "choose",
+      });
+      navigate("choose");
     }
   }
 
@@ -179,21 +264,17 @@ export default function App() {
 
         {route === "home" && (
           <HomeView
+            onStartWithAI={handleStartWithAI}
+            onNavigate={navigate}
             started={game.started}
             lastScene={game.scene}
-            onStartNew={() =>
-              game.started ? setModal("new") : navigate("choose")
-            }
-            onNavigate={navigate}
           />
         )}
 
         {route === "choose" && (
           <ChooseView
-            home={home}
             contract={game.contract}
             currentHouse={game.house}
-            price={price}
             onChooseContract={(c: Contract) =>
               setGame((p) => ({
                 ...makeNewGame(),
@@ -216,7 +297,7 @@ export default function App() {
 
         {route === "explore" && (
           <ExploreView
-            home={home}
+            home={homes[game.house]}
             notes={game.notes}
             inspected={game.inspected}
             detail={detail}
