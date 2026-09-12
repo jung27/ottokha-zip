@@ -16,7 +16,7 @@ export function Header({
       >
         <Icon name="door" className="w-6 h-6 text-[#add9b9]" />
         <span>
-          어떡하집<span className="text-[#add9b9]">.</span>
+          어떡하집<span className="text-[#add9b9]">?</span>
         </span>
       </button>
       <nav className="flex items-center gap-4">
