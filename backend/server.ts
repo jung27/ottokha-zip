@@ -1,7 +1,7 @@
 import "dotenv/config"; // 반드시 최상단에 위치
 import express, { type Express, type Request, type Response } from "express";
 import { GoogleGenAI } from "@google/genai";
-const cors = require("cors");
+import cors from "cors";
 
 // 환경변수가 제대로 들어왔는지 콘솔로 확인
 console.log(
@@ -34,4 +34,11 @@ app.get("/api", async (req: Request, res: Response) => {
   res.json(result);
 });
 
-app.listen(80);
+if (process.env.NODE_ENV !== "production") {
+  const PORT = process.env.PORT || 8000;
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+  });
+}
+
+export default app;
