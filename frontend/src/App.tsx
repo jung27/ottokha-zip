@@ -13,18 +13,20 @@ import {
   makeNewGame,
   selectedHome,
 } from "./data";
-import {
-  type GameState,
-  type ModalKind,
-  type PlayViewProps,
-} from "./types";
+import { type GameState, type ModalKind, type PlayViewProps } from "./types";
 import { ChooseView } from "./views/ChooseView";
 import { DocumentView } from "./views/DocumentView";
 import { ExploreView } from "./views/ExploreView";
 import { HomeView } from "./views/HomeView";
 import { TalkView } from "./views/TalkView";
 import { EndingScene } from "./views/EndingScene";
-import { advanceGame, chooseAnswer, getSuccessExplanation, retryStep, submitChecks } from "./choiceFlow";
+import {
+  advanceGame,
+  chooseAnswer,
+  getSuccessExplanation,
+  retryStep,
+  submitChecks,
+} from "./choiceFlow";
 
 const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL || "http://localhost"
@@ -134,11 +136,19 @@ export default function App() {
           ? step.title
           : "첫 집을 고르다";
     document.title = label + " | 어떡하집?";
-    window.history.replaceState(
-      null,
-      "",
-      "#" + (isHome ? "home" : game.page === "play" ? step.id : game.page),
-    );
+
+    // 현재 URL에 붙어있던 ?d=... 등의 쿼리 보존
+    const queryPart = window.location.hash.includes("?")
+      ? "?" + window.location.hash.split("?")[1]
+      : "";
+
+    const targetHash = isHome
+      ? "home"
+      : game.page === "play"
+        ? step.id
+        : game.page + (game.page === "ending" ? queryPart : "");
+
+    window.history.replaceState(null, "", "#" + targetHash);
     window.scrollTo({ top: 0, behavior: "instant" });
     appRef.current?.focus({ preventScroll: true });
   }, [game.page, game.cursor, isHome, ending, step.title, step.id]);
@@ -222,8 +232,7 @@ export default function App() {
         return previous.prologue < 2
           ? { ...previous, prologue: previous.prologue + 1 }
           : { ...previous, page: "contract" };
-      if (previous.page === "contract")
-        return { ...previous, page: "house" };
+      if (previous.page === "contract") return { ...previous, page: "house" };
       if (previous.contract === "jeonse" && previous.house === "goshiwon")
         return previous;
       return { ...previous, page: "play", cursor: "listing" };
@@ -262,10 +271,22 @@ export default function App() {
 
   return (
     <div className="min-h-svh">
-      <SceneImagePreloader backgrounds={game.page === "play" && !isHome
-        ? [step.background, ...step.beats.map((beat) => beat.background ?? step.background),
-          ...(steps[index + 1] ? [steps[index + 1].beats[0]?.background ?? steps[index + 1].background] : [])]
-        : ["app", "message", "office"]} />
+      <SceneImagePreloader
+        backgrounds={
+          game.page === "play" && !isHome
+            ? [
+                step.background,
+                ...step.beats.map((beat) => beat.background ?? step.background),
+                ...(steps[index + 1]
+                  ? [
+                      steps[index + 1].beats[0]?.background ??
+                        steps[index + 1].background,
+                    ]
+                  : []),
+              ]
+            : ["app", "message", "office"]
+        }
+      />
       <Header
         onHome={() => setShowHome(true)}
         onGuide={() => setShowOnboarding(true)}
@@ -316,10 +337,7 @@ export default function App() {
             onBack={() =>
               setGame((previous) => ({
                 ...previous,
-                page:
-                  previous.page === "house"
-                    ? "contract"
-                    : "prologue",
+                page: previous.page === "house" ? "contract" : "prologue",
               }))
             }
           />
